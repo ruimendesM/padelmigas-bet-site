@@ -1,0 +1,491 @@
+openapi: 3.1.0
+info:
+  title: Padelmigas Bet API
+  version: 1.0.0
+  description: >
+    Public voting API for padel tournament group standings. Generated from the Zod schemas in
+    packages/contracts — edit the schemas, not this file. Every response that depends on voter
+    state is sent with Cache-Control: no-store (ADR-008).
+servers:
+  - url: /api/v1
+    description: Hosted by apps/web today; detachable to a standalone service without contract change
+
+tags:
+  - name: public
+  - name: admin
+
+paths:
+  /tournaments:
+    get:
+      tags: [public]
+      summary: List published tournaments
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, closed, all], default: all }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Newest first (FR-023)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tournaments]
+                properties:
+                  tournaments:
+                    type: array
+                    items: { $ref: "#/components/schemas/TournamentSummary" }
+                  nextCursor: { type: string, nullable: true }
+
+  /tournaments/{slug}:
+    get:
+      tags: [public]
+      summary: Tournament detail with groups, pairs, the caller's vote state, and results where revealed
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: >
+            For each group, `results` is present only when the caller has voted on that group or
+            voting has closed (FR-020, FR-021). When absent, no counts appear anywhere in the payload.
+          headers:
+            Cache-Control:
+              schema: { type: string, example: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TournamentDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /groups/{groupId}/ballots:
+    post:
+      tags: [public]
+      summary: Cast this voter's single ballot for a group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BallotSubmission" }
+      responses:
+        "201":
+          description: Ballot recorded; the group's results are returned in the same response (SC-005)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ballot, results]
+                properties:
+                  ballot: { $ref: "#/components/schemas/OwnBallot" }
+                  results: { $ref: "#/components/schemas/GroupResults" }
+        "400":
+          description: |
+            Ballot rejected without storing anything (FR-010). `code` is one of:
+            `INCOMPLETE_BALLOT`, `DUPLICATE_POSITION`, `UNKNOWN_PAIR`, `MISSING_PAIR`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: "`ALREADY_VOTED` — this voter already has a ballot for this group (FR-013)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`VOTING_CLOSED` — decided from server time only (FR-011, SC-007)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /groups/{groupId}/results:
+    get:
+      tags: [public]
+      summary: Crowd results for one group, subject to the reveal gate
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupResults" }
+        "403":
+          description: "`RESULTS_HIDDEN` — caller has not voted and voting is still open (SC-006)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /players/{playerId}:
+    get:
+      tags: [public]
+      summary: A player and every tournament appearance (FR-025)
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlayerDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/tournaments/preview:
+    post:
+      tags: [admin]
+      security: [{ organiserSession: [] }]
+      summary: Validate a lineup payload and return the derived tournament without persisting it (FR-002)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LineupPayload" }
+      responses:
+        "200":
+          description: Derived groups, pairs, and resolved player identities
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LineupPreview" }
+        "400":
+          description: |
+            Every problem is reported at once (FR-005). `code` is one of: `UNRESOLVED_PLAYERS`,
+            `MALFORMED_PAYLOAD`, `START_NOT_IN_FUTURE`, `DUPLICATE_PLAYER`, `POINTS_MISMATCH`,
+            `INVALID_GROUP_SIZE`, `SLUG_TAKEN`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorWithIssues" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+
+  /admin/tournaments:
+    post:
+      tags: [admin]
+      security: [{ organiserSession: [] }]
+      summary: Publish a previously previewed lineup (FR-002, FR-006)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/LineupPayload"
+                - type: object
+                  required: [confirm]
+                  properties:
+                    confirm:
+                      type: boolean
+                      description: Must be true; guards against publishing straight from a paste
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TournamentDetail" }
+        "400":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorWithIssues" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "409":
+          description: "`SLUG_TAKEN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /admin/rankings/sync:
+    post:
+      tags: [admin]
+      security: [{ organiserSession: [] }]
+      summary: Import the public ranking sheet into players and rating snapshots
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rowsRead, playersCreated, playersUpdated, snapshotsWritten, sourceFetchedAt]
+                properties:
+                  rowsRead: { type: integer }
+                  playersCreated: { type: integer }
+                  playersUpdated: { type: integer }
+                  snapshotsWritten: { type: integer }
+                  sourceFetchedAt: { type: string, format: date-time }
+                  stale:
+                    type: boolean
+                    description: True when the sheet was unreachable and the last snapshot was reused (Risk R3)
+        "409":
+          description: "`DUPLICATE_MATCH_KEY` — two source rows normalise to the same name; import aborted (ADR-007)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorWithIssues" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+
+components:
+  securitySchemes:
+    organiserSession:
+      type: apiKey
+      in: cookie
+      name: pm_admin
+      description: Server-signed organiser session cookie; the anon public never holds one
+
+  responses:
+    NotFound:
+      description: "`NOT_FOUND`"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorised:
+      description: "`UNAUTHORISED` (FR-006)"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: "`RATE_LIMITED` (Risk R2)"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    ErrorWithIssues:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            issues:
+              type: array
+              description: Every offending entry, not just the first (FR-005)
+              items:
+                type: object
+                required: [path, message]
+                properties:
+                  path: { type: string, example: "pairs[10].players[1].name" }
+                  message: { type: string, example: "No ranking-list player matches \"Rodrigo da Costa\"" }
+
+    TournamentSummary:
+      type: object
+      required: [id, slug, name, startsAt, status, groupCount, ballotCount]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        startsAt: { type: string, format: date-time }
+        status: { type: string, enum: [open, closed] }
+        groupCount: { type: integer }
+        ballotCount: { type: integer, description: Total ballots across the tournament's groups }
+
+    TournamentDetail:
+      allOf:
+        - $ref: "#/components/schemas/TournamentSummary"
+        - type: object
+          required: [groups]
+          properties:
+            groups:
+              type: array
+              items: { $ref: "#/components/schemas/Group" }
+
+    Group:
+      type: object
+      required: [id, label, position, pairs, hasVoted, votingOpen]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, example: "A" }
+        position: { type: integer }
+        pairs:
+          type: array
+          minItems: 3
+          maxItems: 6
+          items: { $ref: "#/components/schemas/Pair" }
+        hasVoted: { type: boolean, description: Whether this caller has a ballot for this group }
+        votingOpen: { type: boolean, description: Server-decided (FR-011) }
+        ownBallot:
+          allOf: [{ $ref: "#/components/schemas/OwnBallot" }]
+          nullable: true
+          description: Present only when hasVoted is true (FR-014)
+        results:
+          allOf: [{ $ref: "#/components/schemas/GroupResults" }]
+          nullable: true
+          description: Present only when hasVoted is true or votingOpen is false
+
+    Pair:
+      type: object
+      required: [id, seed, club, totalPoints, players]
+      properties:
+        id: { type: string, format: uuid }
+        seed: { type: integer }
+        club: { type: string }
+        totalPoints: { type: integer }
+        players:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            required: [id, name, points]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              points: { type: integer, description: Captured at publish time (FR-007) }
+
+    BallotSubmission:
+      type: object
+      required: [ordering]
+      properties:
+        ordering:
+          type: array
+          minItems: 3
+          maxItems: 6
+          description: Every pair in the group exactly once, positions forming 1..n
+          items:
+            type: object
+            required: [pairId, position]
+            properties:
+              pairId: { type: string, format: uuid }
+              position: { type: integer, minimum: 1, maximum: 6 }
+
+    OwnBallot:
+      type: object
+      required: [castAt, ordering]
+      properties:
+        castAt: { type: string, format: date-time }
+        ordering:
+          type: array
+          items:
+            type: object
+            required: [pairId, position]
+            properties:
+              pairId: { type: string, format: uuid }
+              position: { type: integer }
+
+    GroupResults:
+      type: object
+      required: [groupId, ballotCount, standings]
+      description: Omitted entirely when ballotCount would be 0; callers render "no votes yet" (FR-019)
+      properties:
+        groupId: { type: string, format: uuid }
+        ballotCount: { type: integer, minimum: 1 }
+        standings:
+          type: array
+          description: Crowd predicted order, best first (FR-017, FR-018)
+          items:
+            type: object
+            required: [pairId, predictedPosition, meanPosition, positionShares]
+            properties:
+              pairId: { type: string, format: uuid }
+              predictedPosition: { type: integer, description: 1-based place in the crowd order }
+              meanPosition: { type: number, example: 2.35 }
+              positionShares:
+                type: array
+                description: Share of the group's ballots placing this pair at each position (FR-016)
+                items:
+                  type: object
+                  required: [position, votes, share]
+                  properties:
+                    position: { type: integer }
+                    votes: { type: integer }
+                    share: { type: number, minimum: 0, maximum: 1, example: 0.62 }
+
+    PlayerDetail:
+      type: object
+      required: [id, externalId, name, appearances]
+      properties:
+        id: { type: string, format: uuid }
+        externalId: { type: integer }
+        name: { type: string }
+        club: { type: string, nullable: true }
+        currentPoints: { type: integer, nullable: true }
+        appearances:
+          type: array
+          items:
+            type: object
+            required: [tournament, groupLabel, partner, pointsAtTournament]
+            properties:
+              tournament: { $ref: "#/components/schemas/TournamentSummary" }
+              groupLabel: { type: string }
+              partner:
+                type: object
+                required: [id, name]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+              pointsAtTournament: { type: integer }
+
+    LineupPayload:
+      type: object
+      required: [name, startsAt, pairs]
+      properties:
+        name: { type: string, minLength: 3 }
+        slug: { type: string, description: Derived from name when omitted }
+        startsAt: { type: string, format: date-time, description: Must be in the future; also the voting deadline }
+        pairs:
+          type: array
+          minItems: 3
+          description: Ordered or unordered; grouping is derived from totalPoints descending (FR-003)
+          items:
+            type: object
+            required: [club, totalPoints, players]
+            properties:
+              club: { type: string }
+              totalPoints: { type: integer, description: Must equal the sum of both players' points }
+              group: { type: string, description: Optional explicit group label, overriding derivation }
+              players:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items:
+                  type: object
+                  required: [name, points]
+                  properties:
+                    name: { type: string }
+                    points: { type: integer, minimum: 0 }
+                    externalId:
+                      type: integer
+                      description: Ranking-list ID; required only to disambiguate identical names
+
+    LineupPreview:
+      type: object
+      required: [name, slug, startsAt, groups, resolvedPlayers]
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        startsAt: { type: string, format: date-time }
+        groups:
+          type: array
+          items:
+            type: object
+            required: [label, pairs]
+            properties:
+              label: { type: string }
+              pairs:
+                type: array
+                items: { $ref: "#/components/schemas/Pair" }
+        resolvedPlayers:
+          type: array
+          items:
+            type: object
+            required: [inputName, externalId, displayName, isNew]
+            properties:
+              inputName: { type: string }
+              externalId: { type: integer }
+              displayName: { type: string }
+              isNew: { type: boolean, description: True when this ranking-list player had no local record yet }

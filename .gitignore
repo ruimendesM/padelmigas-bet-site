@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Environment & secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Local ranking data (contains real player names)
+data/rankings/
+*.rankings.csv
+
+# Test & coverage
+coverage/
+playwright-report/
+test-results/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code local overrides
+.claude/settings.local.json

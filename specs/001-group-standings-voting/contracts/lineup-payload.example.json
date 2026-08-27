@@ -1,0 +1,44 @@
+{
+  "_note": "Illustrative fixture. Player names, ranking IDs and clubs are fictional; the point totals and group shape mirror a real 12-pair lineup. Real player data is never committed — it is fetched at runtime from the ranking source configured in RANKINGS_CSV_URL.",
+  "name": "Torneio de Exemplo — 12 Setembro",
+  "slug": "torneio-exemplo-12-setembro",
+  "startsAt": "2026-09-12T18:00:00Z",
+  "pairs": [
+    { "club": "Clube Padel Norte", "totalPoints": 1193, "players": [
+      { "externalId": 101, "name": "Afonso Bastos", "points": 533 },
+      { "externalId": 102, "name": "Vasco Trindade", "points": 660 } ] },
+    { "club": "Clube Padel Norte", "totalPoints": 1014, "players": [
+      { "externalId": 103, "name": "Bernardo Quintela", "points": 507 },
+      { "externalId": 104, "name": "Salvador Neves", "points": 507 } ] },
+    { "club": "Clube Padel Norte", "totalPoints": 944, "players": [
+      { "externalId": 105, "name": "Duarte Vilaça", "points": 495 },
+      { "externalId": 106, "name": "Xavier Lourenço", "points": 449 } ] },
+    { "club": "Clube Padel Norte", "totalPoints": 917, "players": [
+      { "externalId": 107, "name": "Gabriel Rebelo", "points": 481 },
+      { "externalId": 108, "name": "Simão Anjos", "points": 436 } ] },
+    { "club": "Clube Padel Norte", "totalPoints": 896, "players": [
+      { "externalId": 109, "name": "Hugo Vasconcelos", "points": 435 },
+      { "externalId": 110, "name": "Ivo Peixoto", "points": 461 } ] },
+    { "club": "Clube Padel Norte", "totalPoints": 887, "players": [
+      { "externalId": 111, "name": "Leonardo Sampaio", "points": 443 },
+      { "externalId": 112, "name": "Mateus Portela", "points": 444 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 885, "players": [
+      { "externalId": 113, "name": "Otávio Chaves", "points": 442 },
+      { "externalId": 114, "name": "Rodrigo da Costa", "points": 443 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 853, "players": [
+      { "externalId": 115, "name": "Teodoro Marques", "points": 456 },
+      { "externalId": 116, "name": "Ulisses Braga", "points": 397 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 819, "players": [
+      { "externalId": 117, "name": "Vicente Seixas", "points": 398 },
+      { "externalId": 118, "name": "Martim Amaral", "points": 421 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 801, "players": [
+      { "externalId": 119, "name": "Bento Loureiro", "points": 423 },
+      { "externalId": 120, "name": "Caetano Vidal", "points": 378 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 773, "players": [
+      { "externalId": 121, "name": "Emídio Tavares", "points": 381 },
+      { "externalId": 122, "name": "Fábio Cordeiro", "points": 392 } ] },
+    { "club": "Clube Padel Sul", "totalPoints": 750, "players": [
+      { "externalId": 123, "name": "Guilherme Antunes", "points": 375 },
+      { "externalId": 124, "name": "Heitor Pinheiro", "points": 375 } ] }
+  ]
+}
