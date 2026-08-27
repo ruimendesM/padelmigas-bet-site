@@ -52,7 +52,7 @@ target plus one managed database, no queues, workers, or caches
 
 **Scale/Scope**: club-sized — tens of tournaments per year, 2–4 groups each, hundreds of ballots per
 tournament, ~800 players in the ranking source, peak of a few hundred voters in a 10-minute window
-(SC-009). Roughly 8 public screens in phase 1 plus one organiser screen.
+(SC-009). Five public screens in phase 1 (landing list, tournament detail with voting and results, history, player) plus one organiser screen.
 
 ## Constitution Check
 

@@ -103,7 +103,9 @@ and a trigger is not warranted at this scale.
 | `id` | `uuid` PK | value carried in the signed cookie |
 | `created_at`, `last_seen_at` | `timestamptz` NOT NULL | |
 
-No IP, no user agent, no personal data (constitution: Privacy).
+`last_seen_at` is refreshed by the voter-cookie layer on each recognised request, through
+`VoterRepository`. No IP, no user agent, no personal data (constitution: Privacy). Rate limiting
+keys on a salted IP hash held outside Postgres with a 10-minute TTL and is never persisted here.
 
 ### `ballots` — one immutable ballot per voter per group (FR-013)
 

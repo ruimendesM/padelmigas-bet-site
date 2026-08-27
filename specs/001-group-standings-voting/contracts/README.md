@@ -21,7 +21,7 @@ generated from them and committed so the contract is reviewable in the spec; nev
 | GET | `/api/v1/players/{playerId}` | none | FR-025 |
 | POST | `/api/v1/admin/tournaments/preview` | organiser session | FR-001 – FR-005 |
 | POST | `/api/v1/admin/tournaments` | organiser session | FR-002, FR-006 – FR-008 |
-| POST | `/api/v1/admin/rankings/sync` | organiser session | FR-004, FR-007 |
+| POST | `/api/v1/admin/rankings/sync` | organiser session **or** bearer `CRON_SECRET` | FR-004, FR-007 |
 
 ## Rules that bind every endpoint
 
@@ -37,7 +37,10 @@ generated from them and committed so the contract is reviewable in the spec; nev
    localisable copy. Multi-problem responses use `issues[]` and report every offending entry.
 6. **No voter identifiers on the wire**: responses may say `hasVoted` and echo `ownBallot`; they must
    never contain a voter id, and no endpoint lists ballots (FR-022).
-7. **Idempotent by constraint**: a duplicate ballot is a `409 ALREADY_VOTED` produced by the unique
+7. **One non-cookie credential, one route**: bearer `CRON_SECRET` is accepted by
+   `/admin/rankings/sync` and nowhere else, so the scheduler can run without an organiser session.
+   Every other admin route requires the signed organiser cookie.
+8. **Idempotent by constraint**: a duplicate ballot is a `409 ALREADY_VOTED` produced by the unique
    constraint, not a silent second insert.
 
 ## Client generation

@@ -210,7 +210,9 @@ paths:
   /admin/rankings/sync:
     post:
       tags: [admin]
-      security: [{ organiserSession: [] }]
+      security:
+        - organiserSession: []
+        - cronSecret: []
       summary: Import the public ranking sheet into players and rating snapshots
       responses:
         "200":
@@ -242,6 +244,12 @@ components:
       in: cookie
       name: pm_admin
       description: Server-signed organiser session cookie; the anon public never holds one
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: >
+        Shared secret held only by the scheduler, accepted by the rankings-sync route alone so the
+        cron job can run without an organiser session. Never accepted by any other endpoint.
 
   responses:
     NotFound:

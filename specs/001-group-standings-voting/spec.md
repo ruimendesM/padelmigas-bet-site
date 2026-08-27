@@ -178,7 +178,8 @@ cross-tournament appearances are all correct.
   instant, groups, pairs, players, and resolved player identities — and MUST require an explicit
   publish action before anything becomes publicly visible.
 - **FR-003**: The system MUST assign pairs to groups of six in descending order of pair total points,
-  and MUST accept an explicit group assignment in the payload that overrides the derived one.
+  permitting a single smaller final group of three to five pairs when the lineup does not divide
+  evenly, and MUST accept an explicit group assignment in the payload that overrides the derived one.
 - **FR-004**: The system MUST resolve every player in a payload to a single stored player identity,
   matching on the player's name compared after Unicode normalisation, case folding, and whitespace
   collapsing, and MUST use the ranking list's own identifier as that player's canonical external
@@ -197,8 +198,9 @@ cross-tournament appearances are all correct.
 
 **Voting**
 
-- **FR-009**: The system MUST let any visitor, without creating an account, submit one ballot per
-  group: a complete assignment of distinct finishing positions to every pair in that group.
+- **FR-009**: The system MUST let any visitor cast a ballot without creating an account, signing in,
+  or supplying any personal data. A ballot is a complete assignment of distinct finishing positions
+  to every pair in one group. (Uniqueness per voter is specified in FR-013.)
 - **FR-010**: The system MUST reject a ballot that is incomplete, that repeats a position, that names
   a pair outside the group, or that omits a pair in the group, and MUST store nothing in that case.
 - **FR-011**: The system MUST accept ballots only while the tournament's voting window is open — from
@@ -291,6 +293,9 @@ cross-tournament appearances are all correct.
   every valid ballot exactly once, with no duplicate ballots per voter per group.
 - **SC-010**: The web client and a future mobile client can produce identical voting and results
   behaviour against the same published interface, with no rule re-implemented per platform.
+- **SC-011**: A voter can complete and submit a ballot using only a keyboard, and using a screen
+  reader, with every control labelled, focus always visible, text contrast at least 4.5:1, and the
+  recorded vote announced — verified on the voting form and the results view.
 
 ## Assumptions
 

@@ -22,6 +22,7 @@ Server-only variables in `apps/web/.env.local` — never prefixed `NEXT_PUBLIC_`
 | `VOTER_COOKIE_SECRET` | Signing key for the voter cookie (ADR-004) |
 | `ADMIN_PASSWORD_HASH` | Argon2id hash gating the organiser area (FR-006) |
 | `RANKINGS_CSV_URL` | Public CSV export of the club ranking sheet |
+| `CRON_SECRET` | Bearer secret the scheduler uses to call the rankings-sync route |
 
 A missing or empty variable must fail startup loudly rather than degrade — no silent fallbacks.
 
