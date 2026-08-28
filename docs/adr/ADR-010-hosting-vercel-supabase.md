@@ -130,6 +130,31 @@ What remains is a genuine trade, recorded below rather than waved through.
   vendor dependency alive for one HTTP request a week and leaves the sync broken whenever that
   account lapses.
 
+## Amendment — 2026-08-28: the site answers on `padelmigas.ruimendesdev.eu`
+
+The amendment above left the hostname open; it is now decided. The site gets its **own subdomain of
+the maintainer's personal domain**, `padelmigas.ruimendesdev.eu`, served by its own nginx vhost with
+its own certificate, alongside the static site already on `ruimendesdev.eu`.
+
+A **subpath of the existing site** (`ruimendesdev.eu/padel-migas-bet`) was asked for first and
+rejected, for two reasons that are not cosmetic:
+
+- **It would push a deployment detail into the portable packages.** Next's `basePath` rewrites links
+  and asset URLs but not `fetch()`, so `WEB_API_BASE_URL` in `packages/ui-logic/src/query.ts` would
+  have had to carry the mount path — a package that ADR-001 and ADR-002 deliberately keep ignorant of
+  where the API is hosted (Principle II).
+- **It would share a browser origin with the static site.** Both cookies are `Path=/` today; on a
+  shared origin the organiser session would ride along on every request to the rest of the domain,
+  and `SameSite=Strict` gives nothing against same-origin script. A subdomain isolates both by
+  construction, and costs one DNS record.
+
+The subdomain therefore changes no application code at all — it is entirely an nginx and DNS fact.
+
+**Consequences**
+- `server_name padelmigas.ruimendesdev.eu` (T121), and the certificate is issued for that name alone.
+- One DNS `A` record pointing at the same host as the other two services.
+- Cookies keep `Path=/`, which is now correct rather than merely tolerable.
+
 ## References
 - Constitution, Principle V (Simplicity and YAGNI)
 - [plan.md](../../specs/001-group-standings-voting/plan.md) — Constraints, Risk R8

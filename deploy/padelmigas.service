@@ -1,0 +1,50 @@
+# The web app, as a long-lived process on the maintainer's VPS (ADR-010 § Amendment).
+#
+# Installed at /etc/systemd/system/padelmigas.service. The service runs the standalone bundle Next
+# emits (`output: 'standalone'`), which carries its own traced node_modules — there is no `pnpm
+# install` on the host and no build step there either.
+[Unit]
+Description=Padelmigas tournament betting site
+Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=padelmigas
+Group=padelmigas
+
+# `current` is a symlink to the release under releases/ (T125). systemd resolves it at start, so a
+# rollback is a symlink swap plus a restart — the only rollback path left after leaving Vercel.
+WorkingDirectory=/opt/padelmigas/current/apps/web
+ExecStart=/usr/bin/node server.js
+
+# The six server variables (DATABASE_URL, VOTER_COOKIE_SECRET, ADMIN_PASSWORD_HASH,
+# RANKINGS_CSV_URL, CRON_SECRET, RATE_LIMIT_SALT). Root-owned, mode 0600: secrets never enter the
+# repository and never reach an Actions log. `apps/web/src/env.ts` throws at startup if any is
+# missing or malformed, so a half-written file fails loudly here rather than degrading in production.
+EnvironmentFile=/etc/padelmigas/env
+
+# Bound to loopback: nginx is the only thing that may reach it, which is what makes the
+# X-Forwarded-For rule in deploy/nginx.conf the sole source of client addresses (Risk R2).
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+
+Restart=on-failure
+RestartSec=5s
+
+# One box is a single point of failure (ADR-010 § Amendment); these limit the blast radius of a
+# compromise of this process to its own release directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/padelmigas
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+# The weekly ranking sync (FR-004), replacing the Vercel cron the VPS move retired
+# (ADR-010 § Amendment). Triggered by padelmigas-rankings.timer, never enabled directly.
+[Unit]
+Description=Sync club rankings into padelmigas
+Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+After=padelmigas.service
+Requires=padelmigas.service
+
+# A timer that fails is silent, and ADR-010 § Amendment names that as a cost of the move. This is the
+# failure path that reaches a human; see the alert unit for what "reaches" means on this host.
+OnFailure=padelmigas-rankings-alert.service
+
+[Service]
+Type=oneshot
+
+# CRON_SECRET only. The sync route authenticates the bearer token and nothing else here needs the
+# database or the cookie secrets.
+EnvironmentFile=/etc/padelmigas/env
+User=padelmigas
+Group=padelmigas
+
+# --fail-with-body: without it curl exits 0 on a 500 and the timer reports success while the sync is
+# broken — precisely the silent failure this unit exists to avoid. The token goes through a header on
+# a loopback request, so it never appears in a URL, a proxy log, or the journal.
+ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 120 \
+    -X POST http://127.0.0.1:3000/api/v1/admin/rankings/sync \
+    -H "Authorization: Bearer ${CRON_SECRET}"
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

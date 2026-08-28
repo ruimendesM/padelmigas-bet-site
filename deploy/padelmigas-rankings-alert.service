@@ -1,0 +1,18 @@
+# Where a failed sync goes. Started only by OnFailure= in padelmigas-rankings.service.
+#
+# ADR-010 § Amendment accepts the systemd timer as a moving part on the condition that its failures
+# reach a person. `systemctl --failed` does not qualify: nobody reads it. This logs at emerg, which
+# systemd broadcasts to every logged-in terminal, and mails root when an MTA exists.
+#
+# This is the weakest link in the deployment. docs/deploy/vps.md § Alerting says how to point it at
+# real alerting once there is any.
+[Unit]
+Description=Report a failed padelmigas ranking sync
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'journalctl -u padelmigas-rankings.service -n 40 --no-pager \
+    | systemd-cat -t padelmigas-sync-failed -p emerg; \
+    command -v mail >/dev/null 2>&1 \
+    && journalctl -u padelmigas-rankings.service -n 40 --no-pager \
+    | mail -s "padelmigas: weekly ranking sync FAILED" root || true'

@@ -1,0 +1,16 @@
+# Weekly ranking sync (FR-004). The club sheet changes at most weekly, so this matches the source
+# rather than polling it.
+[Unit]
+Description=Weekly club ranking sync for padelmigas
+Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+
+[Timer]
+OnCalendar=Mon 04:00
+# The host is a single box that does get rebooted (ADR-010 § Amendment). Persistent=true runs a sync
+# that was missed while it was down, instead of skipping a week in silence.
+Persistent=true
+RandomizedDelaySec=15m
+Unit=padelmigas-rankings.service
+
+[Install]
+WantedBy=timers.target
