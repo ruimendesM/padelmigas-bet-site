@@ -173,6 +173,40 @@ This repository starts with none. All three are required by
 Prefer a **fresh keypair for this repository** over reusing the one the other services share: one
 compromised key then cannot move all three.
 
+Generate the keypair with no passphrase — CI has nobody to type one — and store the private half
+without it ever reaching a clipboard:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/padelmigas_deploy -C "github-actions padelmigas deploy" -N ""
+gh secret set DEPLOY_KEY < ~/.ssh/padelmigas_deploy
+```
+
+**Verify the key by fingerprint, not by logging in.** Two traps, both hit on the first real setup:
+
+- `ssh-copy-id` reported *"All keys were skipped because they already exist on the remote system"*
+  for a key that was **not** installed, and exited 0. It never wrote anything. `-f` forces the copy
+  and skips that detection.
+- `ssh -i <key> -o IdentitiesOnly=yes <alias>` **is not proof the key works.** `IdentitiesOnly` still
+  permits identities named in `~/.ssh/config`, so the login succeeded on a personal key while the
+  deploy key was absent — and the failure only surfaced in Actions, as
+  `Permission denied (publickey,password)`.
+
+Compare fingerprints instead, which cannot pass by accident:
+
+```bash
+ssh-keygen -lf ~/.ssh/padelmigas_deploy.pub
+ssh <host> 'while read -r l; do [ -n "$l" ] && echo "$l" | ssh-keygen -lf - 2>/dev/null; done < ~/.ssh/authorized_keys'
+```
+
+The first fingerprint must appear in the second list. Then exercise the key with everything else
+switched off — no agent, no config:
+
+```bash
+SSH_AUTH_SOCK= ssh -F /dev/null -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes \
+  -i ~/.ssh/padelmigas_deploy <user>@<host> \
+  'whoami; sudo -n systemctl restart padelmigas.service; mkdir -p /opt/padelmigas/releases/_probe && rmdir /opt/padelmigas/releases/_probe && echo writable'
+```
+
 ---
 
 ## Deploying
