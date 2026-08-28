@@ -113,8 +113,12 @@ jobs:
       # The app under test reads DATABASE_URL; e2e points it at the same scratch database.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/padelmigas_e2e
       VOTER_COOKIE_SECRET: ci-voter-cookie-secret-not-a-real-key-000000
-      # argon2id hash of "ci-only-password", generated for CI and valid nowhere else.
-      ADMIN_PASSWORD_HASH: ${{ secrets.CI_ADMIN_PASSWORD_HASH }}
+      # argon2id hash of the password on the line below. Committed, not held as a secret: the
+      # plaintext is right here in the clear, so a secret would protect nothing while adding a
+      # silent failure mode -- an unset secret resolves to empty, env validation rejects it, and the
+      # app never boots, which is exactly how this job failed on its first real run. Same reasoning
+      # as TEST_ADMIN_PASSWORD_HASH in tests/contract/setup.ts. Valid nowhere but CI.
+      ADMIN_PASSWORD_HASH: $argon2id$v=19$m=19456,t=2,p=1$COJEoYiKe6L0JaRLwMiS5Q$+1Ds6Rx48Qg+AtZoZqw8IVcmMUuHuY+kwI17FBAI6PM
       ADMIN_PASSWORD: ci-only-password
       RANKINGS_CSV_URL: http://127.0.0.1:4599/rankings.csv
       CRON_SECRET: ci-cron-secret-not-a-real-secret-0000000000
