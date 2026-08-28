@@ -101,8 +101,19 @@ sudo editor /etc/padelmigas/env
 
 The pooler requirement has two independent reasons: burst connections when a tournament opens
 (Risk R8), and the fact that Supabase's direct endpoint resolves to **IPv6 only**, which neither
-GitHub Actions runners nor many VPS hosts can reach. Write no quotes around the values — systemd
-takes the line literally.
+GitHub Actions runners nor many VPS hosts can reach. Copy the pooler URI whole rather than editing
+the port of the direct one: the pooler's username carries the project ref (`postgres.<ref>`) and its
+host differs too, so a URI that is correct apart from the port fails to authenticate.
+
+Quotes around values are stripped by systemd, which does understand shell-style quoting here — but
+write them unquoted anyway. It removes any question of what the value actually is, and it lets a
+check like `grep '^ADMIN_PASSWORD_HASH=\$argon2id\$'` mean what it appears to mean.
+
+Verify without printing any secret:
+
+```bash
+sudo awk -F= '{printf "%-22s %s chars\n", $1, length($0)-length($1)-1}' /etc/padelmigas/env
+```
 
 ### 4. DNS, then the certificate, then nginx
 
