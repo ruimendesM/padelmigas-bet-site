@@ -5,7 +5,7 @@
 # install` on the host and no build step there either.
 [Unit]
 Description=Padelmigas tournament betting site
-Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+Documentation=https://github.com/ruimendesM/padelmigas-bet-site/blob/main/docs/deploy/vps.md
 After=network-online.target
 Wants=network-online.target
 

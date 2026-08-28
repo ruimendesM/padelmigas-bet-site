@@ -2,7 +2,7 @@
 # (ADR-010 § Amendment). Triggered by padelmigas-rankings.timer, never enabled directly.
 [Unit]
 Description=Sync club rankings into padelmigas
-Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+Documentation=https://github.com/ruimendesM/padelmigas-bet-site/blob/main/docs/deploy/vps.md
 After=padelmigas.service
 Requires=padelmigas.service
 

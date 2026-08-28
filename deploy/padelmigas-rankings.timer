@@ -2,7 +2,7 @@
 # rather than polling it.
 [Unit]
 Description=Weekly club ranking sync for padelmigas
-Documentation=https://github.com/RuiMendes/padelmigas-bet-site/blob/main/docs/deploy/vps.md
+Documentation=https://github.com/ruimendesM/padelmigas-bet-site/blob/main/docs/deploy/vps.md
 
 [Timer]
 OnCalendar=Mon 04:00
