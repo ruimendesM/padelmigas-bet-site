@@ -120,6 +120,9 @@ jobs:
       # as TEST_ADMIN_PASSWORD_HASH in tests/contract/setup.ts. Valid nowhere but CI.
       ADMIN_PASSWORD_HASH: $argon2id$v=19$m=19456,t=2,p=1$COJEoYiKe6L0JaRLwMiS5Q$+1Ds6Rx48Qg+AtZoZqw8IVcmMUuHuY+kwI17FBAI6PM
       ADMIN_PASSWORD: ci-only-password
+      # The publish spec signs in with this. Without it the spec skips rather than failing, so the
+      # job stays green either way -- but sign-in is then never exercised, which is worth having.
+      E2E_ADMIN_PASSWORD: ci-only-password
       RANKINGS_CSV_URL: http://127.0.0.1:4599/rankings.csv
       CRON_SECRET: ci-cron-secret-not-a-real-secret-0000000000
       RATE_LIMIT_SALT: ci-rate-limit-salt

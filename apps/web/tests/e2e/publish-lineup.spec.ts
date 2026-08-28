@@ -18,6 +18,21 @@ test.describe('publish a lineup', () => {
     page,
     request,
   }) => {
+    // Every precondition is checked BEFORE the first action, so a fixture-less run skips rather than
+    // fails. `signInAsOrganiser` throws by design when it is called without a password — it is a
+    // helper, and a missing credential mid-flow is a real error — so calling it ahead of these
+    // guards made the skip below unreachable and turned "no fixtures" into a red build. The
+    // sibling spec `vote-and-reveal` has always guarded first; this one now matches it.
+    const lineup = JSON.parse(process.env.E2E_LINEUP_JSON ?? '{}') as { pairs?: unknown[] };
+    test.skip(
+      !process.env.E2E_ADMIN_PASSWORD,
+      'E2E_ADMIN_PASSWORD must be set; the publish flow signs in as the organiser.',
+    );
+    test.skip(
+      !Array.isArray(lineup.pairs) || lineup.pairs.length < 3,
+      'E2E_LINEUP_JSON must carry at least three pairs of players that exist in the synced ranking.',
+    );
+
     await signInAsOrganiser(request);
 
     // The players are read from the ranking the environment was seeded with.
@@ -25,13 +40,6 @@ test.describe('publish a lineup', () => {
     expect(players.ok()).toBeTruthy();
 
     const name = `Torneio E2E ${Date.now()}`;
-    const lineup = JSON.parse(process.env.E2E_LINEUP_JSON ?? '{}') as {
-      pairs?: unknown[];
-    };
-    test.skip(
-      !Array.isArray(lineup.pairs) || lineup.pairs.length < 3,
-      'E2E_LINEUP_JSON must carry at least three pairs of players that exist in the synced ranking.',
-    );
 
     const payload = { ...lineup, name, startsAt: futureStart() };
 
