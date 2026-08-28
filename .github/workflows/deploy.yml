@@ -1,0 +1,163 @@
+# Deploy apps/web to the maintainer's VPS (ADR-010 § Amendment).
+#
+# Same idiom as the two services already on that host: build in Actions, rsync the artifact, restart
+# a systemd unit. No container runtime, deliberately — two deploy idioms on one box is the
+# complexity Principle V exists to prevent.
+name: Deploy
+
+# Runs only after CI has passed on main, rather than re-running the gates here. workflow_run gives
+# that ordering for free; the cost is that every step below must pin the commit CI actually tested
+# (github.event.workflow_run.head_sha), because the default checkout for this event is the tip of
+# the default branch, which may already have moved on.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  RELEASES: /opt/padelmigas/releases
+  CURRENT: /opt/padelmigas/current
+  # Liveness is checked through the unit's own port rather than through nginx, so a failure here
+  # accuses the release and not the proxy or the certificate.
+  APP_ORIGIN: http://127.0.0.1:3100
+
+jobs:
+  deploy:
+    name: Build and release
+    runs-on: ubuntu-latest
+    # ubuntu-latest is x86_64 and so is the target, which is what makes shipping the traced
+    # @node-rs/argon2 binding safe — a native addon mismatch fails at process start, not at build.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:client
+
+      - name: Build the standalone bundle
+        run: pnpm --filter @padelmigas/web build
+
+      # Next traces server code into .next/standalone but leaves the browser assets and public files
+      # out of it, because a CDN normally serves them. Nothing else serves them here, so they are
+      # copied in and the Node process serves them itself.
+      - name: Assemble the release
+        run: |
+          set -euo pipefail
+          rm -rf release
+          cp -R apps/web/.next/standalone release
+          cp -R apps/web/.next/static release/apps/web/.next/static
+          if [ -d apps/web/public ]; then cp -R apps/web/public release/apps/web/public; fi
+          test -f release/apps/web/server.js
+          echo "${{ github.event.workflow_run.head_sha || github.sha }}" > release/RELEASE_SHA
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Trust the host key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      # The release lands in a directory of its own and nothing is switched yet. Up to this point a
+      # failure leaves the running site untouched.
+      - name: Upload the release
+        run: |
+          set -euo pipefail
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          TARGET="${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+          ssh "$TARGET" "mkdir -p '${{ env.RELEASES }}/$SHA'"
+          rsync -az --delete release/ "$TARGET:${{ env.RELEASES }}/$SHA/"
+
+      # T125: the switch is a symlink swap, which is the only rollback that exists after leaving
+      # Vercel. The previous target is recorded first so this step can undo itself.
+      - name: Switch and restart
+        id: switch
+        run: |
+          set -euo pipefail
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" bash -euo pipefail <<REMOTE
+            PREVIOUS=\$(readlink -f '${{ env.CURRENT }}' 2>/dev/null || echo '')
+            echo "previous=\$PREVIOUS"
+            ln -sfn '${{ env.RELEASES }}/$SHA' '${{ env.CURRENT }}.new'
+            mv -T '${{ env.CURRENT }}.new' '${{ env.CURRENT }}'
+            sudo systemctl restart padelmigas.service
+            echo "\$PREVIOUS" > /opt/padelmigas/PREVIOUS
+          REMOTE
+
+      # Boot is where a bad release actually fails: env.ts throws on a malformed variable and the
+      # native argon2 binding is resolved at first use, neither of which the build can catch.
+      - name: Verify the release is serving
+        id: verify
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" bash -euo pipefail <<REMOTE
+            for attempt in \$(seq 1 30); do
+              code=\$(curl -s -o /dev/null -w '%{http_code}' '${{ env.APP_ORIGIN }}/admin' || true)
+              if [ "\$code" = "200" ]; then echo "process alive after \${attempt}s"; exit 0; fi
+              sleep 1
+            done
+            echo "the new release did not serve /admin within 30s"
+            systemctl status padelmigas.service --no-pager || true
+            journalctl -u padelmigas.service -n 50 --no-pager || true
+            exit 1
+          REMOTE
+
+      # Only a failed liveness check rolls back, and only because that means this release cannot run
+      # at all. A database or upstream outage is deliberately NOT rolled back: the previous release
+      # would fail identically, and flapping between two broken versions hides the real cause.
+      - name: Roll back to the previous release
+        if: failure() && steps.switch.outcome == 'success'
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" bash -euo pipefail <<'REMOTE'
+            PREVIOUS=$(cat /opt/padelmigas/PREVIOUS 2>/dev/null || true)
+            if [ -z "$PREVIOUS" ] || [ ! -d "$PREVIOUS" ]; then
+              echo "no previous release on disk; leaving the symlink alone for a human"
+              exit 1
+            fi
+            ln -sfn "$PREVIOUS" /opt/padelmigas/current.new
+            mv -T /opt/padelmigas/current.new /opt/padelmigas/current
+            sudo systemctl restart padelmigas.service
+            echo "rolled back to $PREVIOUS"
+          REMOTE
+
+      # Keeps the last five, so a rollback has somewhere to go and the disk does not fill silently —
+      # a full disk on a single box takes the site down (ADR-010 § Amendment).
+      - name: Prune old releases
+        if: success()
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" bash -euo pipefail <<'REMOTE'
+            cd /opt/padelmigas/releases
+            KEEP=$(readlink -f /opt/padelmigas/current)
+            ls -1dt */ | tail -n +6 | while read -r old; do
+              # `set -e` plus a bare `[ ... ] && continue` exits the shell when the test is false,
+              # which would abort the prune after the first release it decided to keep.
+              if [ "$(readlink -f "$old")" != "$KEEP" ]; then
+                rm -rf -- "$old"
+              fi
+            done
+            df -h /opt | tail -1
+          REMOTE
