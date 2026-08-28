@@ -50,9 +50,25 @@ sudo chmod -R g+w /opt/padelmigas
 ```
 
 ```bash
-echo "$USER ALL=(root) NOPASSWD: /bin/systemctl restart padelmigas.service" \
+printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl restart padelmigas.service, /bin/systemctl restart padelmigas.service\n' "$USER" \
   | sudo tee /etc/sudoers.d/padelmigas-deploy && sudo chmod 440 /etc/sudoers.d/padelmigas-deploy
 ```
+
+Both paths are listed because **sudoers matches the command path as a string**, and `/bin` being a
+symlink to `/usr/bin` on Debian does not make the two spellings equal to sudo. `sudo` resolves
+`systemctl` through `PATH`, which yields `/usr/bin/systemctl`; a rule naming only `/bin/systemctl`
+silently fails to match, sudo asks for a password nobody is there to type, and the deploy dies at the
+restart step for a reason the logs do not explain.
+
+Confirm the rule actually works before relying on it — a syntax error in a sudoers file is not
+reported until something tries to use it:
+
+```bash
+sudo -n systemctl restart padelmigas.service; echo "exit: $?"
+```
+
+`Failed to restart` with exit 1 is the expected answer before the first deploy (the unit exists but
+has no release yet). `sudo: a password is required` means the rule did not match.
 
 Scoped to that one unit on purpose: the deploy key is held by GitHub, so whatever it can run is
 what an attacker with that key can run.
