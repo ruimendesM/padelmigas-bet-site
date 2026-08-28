@@ -177,6 +177,19 @@ the importer re-checks for duplicate match keys on every sync and fails loudly (
   self-hosting (no).
 - **See**: [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md)
 
+> **Amended 2026-08-28 — `apps/web` moves to the maintainer's own VPS.** "Self-hosting (no)" above
+> priced a VPS as taking on patching, backups and TLS. It does not, once the tiers are split:
+> Supabase EU stays exactly as decided and keeps the data and its backups, so the VPS runs a
+> stateless app and losing the box loses only uptime. The maintainer already operates that host for
+> two other services, so patching and TLS are already sunk rather than newly acquired, and the
+> existing deploy idiom there — build in CI, rsync the artifact, restart a systemd unit — absorbs a
+> third service without a new platform.
+>
+> What is genuinely given up: preview environments per change, and cron as a platform feature rather
+> than a systemd timer someone has to notice failing. What is gained: no cold starts, which was this
+> decision's most user-visible cost, and an accurate rate-limit bucket instead of a per-instance one.
+> Full trade-off in [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md) § Amendment.
+
 ### D10 — Group derivation and size
 
 - **Decision**: pairs are ordered by total points descending and chunked into groups of six; the

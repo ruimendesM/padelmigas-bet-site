@@ -29,7 +29,10 @@ and clients consume the generated `packages/client` rather than constructing URL
 
 ### Negative
 - Until the API is detached, a mobile client's backend availability is tied to the web app's deploys.
-- Vercel's function runtime characteristics (cold starts, request limits) apply to the API too.
+- The host's runtime characteristics apply to the API too. **Amended 2026-08-28**: this read
+  "Vercel's function runtime characteristics (cold starts, request limits)". `apps/web` now runs
+  as a long-lived process on a VPS (ADR-010 § Amendment), so cold starts no longer apply and the
+  ceiling is the box and the database pool rather than a function platform's limits.
 - The discipline that keeps route files thin is a review responsibility; only the import boundary is
   automated, not the "no branching in adapters" rule.
 

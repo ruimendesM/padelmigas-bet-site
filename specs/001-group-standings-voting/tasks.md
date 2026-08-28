@@ -254,6 +254,34 @@ product API by design (ADR-002) and therefore absent from the generated client.
 - [X] T116 Route `apps/web/components/BallotForm.tsx` through `api.castBallot`, mapping `ApiRequestError.code` to the translated message instead of decoding the error body by hand (FR-010, Principle III)
 - [X] T117 Route the three organiser calls in `apps/web/app/admin/page.tsx` — preview, publish, rankings sync — through the generated client, and rewrite `fail()` to take an `ApiRequestError` so network and handler failures share one shape (FR-002, FR-004, Principle III)
 
+---
+
+## Phase 10: Deploy to the maintainer's VPS (2026-08-28)
+
+Recorded per Principle I before any deploy file is written. Rationale and the full trade-off:
+[ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md) § Amendment. Supabase EU is unchanged;
+only `apps/web` moves.
+
+**Blocked on three facts about the host** that cannot be determined from the repository: the domain
+or subdomain the site answers on (needed for `server_name` and the certificate), the existing nginx
+vhost layout, and whether a Node 22 runtime is present. T121 and T122 cannot be written without the
+first.
+
+- [ ] T118 Set `output: 'standalone'` and `outputFileTracingRoot` (pointed at the monorepo root) in `apps/web/next.config.ts`. Without the tracing root, pnpm's symlinked workspace dependencies are traced wrongly and the bundle fails at runtime rather than at build (ADR-010 § Amendment)
+- [ ] T119 Verify the standalone bundle boots from a clean directory with only the traced `node_modules`, and that `@node-rs/argon2` — a native addon — loads. An architecture or libc mismatch fails at process start, not at build time, so this must be checked against the target's platform rather than assumed
+- [ ] T120 Add `deploy/padelmigas.service`: systemd unit running the standalone server, `EnvironmentFile=/etc/padelmigas/env` (root-owned, mode 0600), `Restart=on-failure`. Secrets live in that file and never in the repository or in Actions logs
+- [ ] T121 Add `deploy/nginx.conf`: the vhost, TLS, and `proxy_set_header X-Forwarded-For $remote_addr`. **Overwrite, not append** — the idiomatic `$proxy_add_x_forwarded_for` would let a caller supply their own first hop and rotate the ballot rate-limit key at will, because `clientAddress()` trusts the first hop (Risk R2, ADR-010 § Amendment)
+- [ ] T122 Add an architecture test asserting the committed nginx config sets `X-Forwarded-For` to `$remote_addr`, so the rate limiter's assumption cannot be silently broken by a later edit. The rule is invisible at the call site and would otherwise decay (Risk R2)
+- [ ] T123 Add `deploy/padelmigas-rankings.service` and `.timer`: weekly systemd timer calling `/api/v1/admin/rankings/sync` with the bearer `CRON_SECRET`, replacing the Vercel cron. A timer fails silently, so it needs a failure path that reaches a human — ADR-010 § Amendment names this as a cost of the move (FR-004)
+- [ ] T124 Add `.github/workflows/deploy.yml`: gates, then build, then rsync the standalone bundle, then `systemctl restart`. Mirrors the deploy idiom already used for the other two services on that host. Deploys only after CI passes on `main`
+- [ ] T125 Keep the previous release on disk and make the restart switch a symlink, so a bad deploy is reversible. ADR-010 § Amendment records the loss of platform rollback as a cost of leaving Vercel; this is the mitigation, and without it there is none
+- [ ] T126 Delete `apps/web/vercel.json` and retire T100, which configured the Vercel cron the timer in T123 replaces. Leaving it invites a second scheduler firing the same route
+- [ ] T127 Write `docs/deploy/vps.md`: one-time host setup (Node runtime, `/etc/padelmigas/env`, unit installation, certificate) and the runbook for a deploy, a rollback, and a failed sync
+
+### Task count (deploy)
+
+10 tasks: build shape 2, systemd 2, nginx 2, CI 1, safety 1, cleanup 1, docs 1.
+
 ### Task count (Principle III)
 
 4 tasks. Not new scope: this is a pre-existing violation of an existing principle, found only because
@@ -348,8 +376,8 @@ first release rather than a follow-up.
 
 ### Task count
 
-117 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12,
-Principle III 4.
+127 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12,
+Principle III 4, Deploy 10.
 
 The Amendment phase (T102–T113) was added on 2026-08-28, after Phase 7, when the first import against
 the real ranking sheet revealed that the source's `ID` column is not unique. It is a correctness fix

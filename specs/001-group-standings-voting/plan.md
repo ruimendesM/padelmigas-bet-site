@@ -64,7 +64,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 | II. Portable Core, Thin Adapters        | No host/vendor imports in core; handlers are `(input, deps) => output`; single Supabase construction site                | Domain in `packages/core`; handlers in `packages/api`; Supabase client only in `packages/db`; shared hooks in `packages/ui-logic`; boundary enforced by `dependency-cruiser` rules run in CI, not by convention      | PASS   |
 | III. Contract-First, Versioned API      | Zod schemas first, generated client, `/api/v1` prefix                                                                    | `packages/contracts` is authored before handlers and generates both the OpenAPI document and `packages/client`; every route lives under `/api/v1`                                                                    | PASS   |
 | IV. Server-Authoritative Trust Boundary | Window, dedupe, validity, aggregation server-side; service-role key server-only; RLS deny-by-default; no ballot exposure | All writes go through route adapters using the service-role key held in server env; RLS grants the anon role nothing; the reveal gate is decided server-side per request and responses are `Cache-Control: no-store` | PASS   |
-| V. Simplicity and YAGNI                 | Smallest viable design; new services justified                                                                           | One deploy target (Vercel) plus Supabase; no queue, cache, worker, or second service; aggregation is a plain SQL view; reserved-but-empty `group_final_standings` table carries no code                              | PASS   |
+| V. Simplicity and YAGNI                 | Smallest viable design; new services justified                                                                           | One deploy target plus Supabase; no queue, cache, worker, or second service; aggregation is a plain SQL view; reserved-but-empty `group_final_standings` table carries no code                              | PASS   |
 
 **Amendment 2026-08-27 (during implementation, per Principle I)**: the driver named above was
 originally `@supabase/supabase-js`. It was replaced by `postgres` (postgres.js) before any
@@ -96,6 +96,23 @@ disambiguation escape hatch is gone; both are recorded in
 [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md) § Amendment, whose "admin merge UI"
 alternative is the eventual mitigation.
 
+**Amendment 2026-08-28 (hosting, per Principle I)**: `apps/web` moves from Vercel to the
+maintainer's existing VPS — built in CI, rsynced as a Next.js standalone bundle, run under systemd
+behind nginx. Supabase EU is unchanged and remains the system of record, still through the pooler.
+
+Principle V is the one to check here, and it is satisfied rather than strained: no new runtime
+service is added, and the host already runs two services for this maintainer under exactly this
+deploy idiom, so the third adds a unit file rather than a platform. ADR-010's original rejection of
+self-hosting rested on backups, patching and TLS; the first does not apply once the database stays in
+Supabase, and the other two are already sunk on that box. Principles I-IV are untouched: the host has
+always been an adapter concern (ADR-002), and nothing in `packages/**` may reference it.
+
+Two consequences are load-bearing at deploy time rather than optional. nginx MUST overwrite
+`X-Forwarded-For` with `$remote_addr` rather than append to it, or the ballot rate limiter's key
+becomes caller-controlled (Risk R2). And the pooler is now mandatory for a second, independent
+reason: Supabase's direct endpoint is IPv6-only and CI runners are IPv4-only (Risk R8). See
+[ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md) § Amendment.
+
 **Post-design re-check (after Phase 1)**: PASS. Two items were reviewed and consciously kept:
 `packages/client` is generated rather than hand-written (Principle III requires it), and aggregation
 is split between a SQL view (counting) and a pure TypeScript function (percentages, ordering,
@@ -111,7 +128,7 @@ graph TD
         Mobile["Mobile client (future)\nReact Native + packages/ui-logic"]
     end
 
-    subgraph Host["Next.js on Vercel (EU)"]
+    subgraph Host["Next.js on the maintainer's VPS (EU), behind nginx"]
         Pages["Server components\n(SSR reads)"]
         Routes["Route adapters\n/api/v1/** (thin)"]
         Cookie["Voter cookie\nsigned httpOnly"]
@@ -164,7 +181,7 @@ Full records live in `docs/adr/`. Summary:
 | [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md)          | Ranking-sheet `ID` as canonical player identifier, normalised exact-name matching | Import fails loudly on any new or renamed player; no fuzzy convenience                          |
 | [ADR-008](../../docs/adr/ADR-008-vote-to-reveal-gating.md)                  | Results gated server-side until the requester votes or voting closes              | No CDN caching of tournament responses; slightly higher server load                             |
 | [ADR-009](../../docs/adr/ADR-009-testing-strategy.md)                       | Vitest unit + contract tests, 100% branch on core rules, 2 Playwright flows       | Coverage floor is a real constraint on core code; deliberately no floor elsewhere               |
-| [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md)                | Vercel (EU) + Supabase EU, no other runtime services                              | Vendor coupling at the host layer, contained to adapters by ADR-001                             |
+| [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md)                | Supabase EU; `apps/web` on the maintainer's VPS (amended 2026-08-28, was Vercel)  | One box is a single point of failure; no preview environments; the proxy must overwrite XFF     |
 
 ## Project Structure
 
