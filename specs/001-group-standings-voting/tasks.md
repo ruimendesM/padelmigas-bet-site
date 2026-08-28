@@ -276,7 +276,7 @@ first.
 - [X] T124 Add `.github/workflows/deploy.yml`: gates, then build, then rsync the standalone bundle, then `systemctl restart`. Mirrors the deploy idiom already used for the other two services on that host. Deploys only after CI passes on `main`
 - [X] T125 Keep the previous release on disk and make the restart switch a symlink, so a bad deploy is reversible. ADR-010 § Amendment records the loss of platform rollback as a cost of leaving Vercel; this is the mitigation, and without it there is none
 - [X] T126 Delete `apps/web/vercel.json` and retire T100, which configured the Vercel cron the timer in T123 replaces. Leaving it invites a second scheduler firing the same route
-- [ ] T127 Write `docs/deploy/vps.md`: one-time host setup (Node runtime, `/etc/padelmigas/env`, unit installation, certificate) and the runbook for a deploy, a rollback, and a failed sync
+- [X] T127 Write `docs/deploy/vps.md`: one-time host setup (Node runtime, `/etc/padelmigas/env`, unit installation, certificate) and the runbook for a deploy, a rollback, and a failed sync
 
 ### Task count (deploy)
 
