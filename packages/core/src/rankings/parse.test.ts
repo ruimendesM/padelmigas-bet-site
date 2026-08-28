@@ -64,9 +64,9 @@ describe('parseRankingCsv', () => {
       displayName: 'Afonso Bastos',
       matchKey: 'afonso bastos',
     });
-    expect(result.snapshots.filter((s) => s.externalId === 101)).toEqual([
-      { externalId: 101, ratedOn: '2026-08-26', points: 533 },
-      { externalId: 101, ratedOn: '2026-08-22', points: 530 },
+    expect(result.snapshots.filter((s) => s.matchKey === 'afonso bastos')).toEqual([
+      { matchKey: 'afonso bastos', ratedOn: '2026-08-26', points: 533 },
+      { matchKey: 'afonso bastos', ratedOn: '2026-08-22', points: 530 },
     ]);
   });
 
@@ -102,7 +102,9 @@ describe('parseRankingCsv', () => {
     // A blank means "not rated on that date", which is not the same as zero points.
     const sparse = ['ID,Nome,26/08/2026,22-08-2026', '106,"Xavier Lourenço",449,'].join('\n');
     const result = parseRankingCsv(sparse);
-    expect(result.snapshots).toEqual([{ externalId: 106, ratedOn: '2026-08-26', points: 449 }]);
+    expect(result.snapshots).toEqual([
+      { matchKey: 'xavier lourenço', ratedOn: '2026-08-26', points: 449 },
+    ]);
   });
 
   it('ignores a non-date column between the name and the ratings', () => {
@@ -110,7 +112,9 @@ describe('parseRankingCsv', () => {
       '\n',
     );
     const result = parseRankingCsv(withExtra);
-    expect(result.snapshots).toEqual([{ externalId: 107, ratedOn: '2026-08-26', points: 481 }]);
+    expect(result.snapshots).toEqual([
+      { matchKey: 'gabriel rebelo', ratedOn: '2026-08-26', points: 481 },
+    ]);
   });
 
   it('rejects two rows whose names normalise identically', () => {
@@ -134,11 +138,22 @@ describe('parseRankingCsv', () => {
     expect(caught?.issues[0]?.message).toContain('202');
   });
 
-  it('rejects two rows sharing an ID', () => {
-    const colliding = ['ID,Nome,26/08/2026', '301,"Um Nome",400', '301,"Outro Nome",410'].join(
-      '\n',
-    );
-    expect(() => parseRankingCsv(colliding)).toThrow(DomainError);
+  it('accepts two rows sharing an ID, because the real sheet is full of them', () => {
+    // FR-004 as amended 2026-08-28. The live sheet has 784 rows carrying only 756 distinct ids: 18
+    // are shared by 46 rows describing different people. Rejecting a repeat meant every import of
+    // the real sheet aborted. Worse, the old code `continue`d past the repeat, so those people were
+    // silently dropped from the parse before the abort ever fired.
+    const shared = ['ID,Nome,26/08/2026', '301,"Um Nome",400', '301,"Outro Nome",410'].join('\n');
+    const result = parseRankingCsv(shared);
+
+    expect(result.players).toHaveLength(2);
+    expect(result.players.map((p) => p.matchKey)).toEqual(['um nome', 'outro nome']);
+    expect(result.players.map((p) => p.externalId)).toEqual([301, 301]);
+    // Both people keep their own rating, keyed by match key rather than by the shared id.
+    expect(result.snapshots).toEqual([
+      { matchKey: 'um nome', ratedOn: '2026-08-26', points: 400 },
+      { matchKey: 'outro nome', ratedOn: '2026-08-26', points: 410 },
+    ]);
   });
 
   it('rejects a header without an ID column', () => {

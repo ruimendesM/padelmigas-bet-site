@@ -67,6 +67,58 @@ describe('POST /api/v1/admin/rankings/sync', () => {
     expect(players[0]?.['count']).toBe(3);
   });
 
+  it('imports rows that share an ID, because the sheet reuses IDs across different people', async () => {
+    // FR-004 as amended 2026-08-28. The real ranking sheet is maintained by a third party and its
+    // `ID` column is not unique: 784 rows carry only 756 distinct IDs, 18 of them shared by 46 rows
+    // describing different people. While a repeated ID was an import failure, every import of the
+    // real sheet aborted and nothing could be published at all (ADR-007 § Amendment).
+    const test = current();
+    test.ranking.csv = rankingCsv([
+      { id: 354, name: 'Alice Ferreira', points: [420, 400] },
+      { id: 354, name: 'Bruno Marques', points: [380, 390] },
+      { id: 355, name: 'Carla Nogueira', points: [310, 300] },
+    ]);
+
+    const response = await POST(syncRequest({ cookie: await organiserCookie() }));
+    expect(response.status).toBe(200);
+    const report = await body<RankingsSyncResponse>(response);
+    expect(report.rowsRead).toBe(3);
+    // Three distinct names means three distinct people, whatever the sheet says their IDs are.
+    expect(report.playersCreated).toBe(3);
+
+    const sql = rawSql();
+    const players = await sql`select match_key, external_id from players order by match_key`;
+    expect(players.map((row) => row['match_key'])).toEqual([
+      'alice ferreira',
+      'bruno marques',
+      'carla nogueira',
+    ]);
+    // The ID is kept as informational metadata, repeats and all — it is simply no longer identity.
+    expect(players.map((row) => row['external_id'])).toEqual([354, 354, 355]);
+  });
+
+  it('does not merge two people who share an ID when the import is re-run', async () => {
+    // The failure this guards against is the dangerous one: upserting on a repeated `external_id`
+    // would silently collapse two real people into one row on the second sync, and the loss would be
+    // invisible because the row count would simply stop growing (data-model § `players`).
+    const test = current();
+    test.ranking.csv = rankingCsv([
+      { id: 354, name: 'Alice Ferreira', points: [420, 400] },
+      { id: 354, name: 'Bruno Marques', points: [380, 390] },
+    ]);
+    const cookie = await organiserCookie();
+
+    await POST(syncRequest({ cookie }));
+    const second = await POST(syncRequest({ cookie }));
+    expect(second.status).toBe(200);
+
+    const report = await body<RankingsSyncResponse>(second);
+    expect(report.playersCreated).toBe(0);
+    expect(report.playersUpdated).toBe(2);
+    const players = await rawSql()`select count(*)::int as count from players`;
+    expect(players[0]?.['count']).toBe(2);
+  });
+
   it('aborts on an ambiguous name and leaves the database untouched', async () => {
     // Two people whose names normalise identically: no lineup name could be resolved with
     // confidence afterwards, so importing anything would be a guess (ADR-007).

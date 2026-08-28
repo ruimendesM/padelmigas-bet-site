@@ -1,10 +1,14 @@
 # Security review — 001-group-standings-voting
 
-**Date**: 2026-08-27 · **Reviewer**: implementation agent · **Scope**: FR-022, SC-006, T101
+**Date**: 2026-08-27, updated 2026-08-28 · **Reviewer**: implementation agent · **Scope**: FR-022,
+SC-006, T101
 
-Four claims were checked. Three are verified and continuously enforced by a test; the fourth is
-**verified in part** and its remaining half needs a live Supabase project. That gap is stated here
-rather than glossed, because an unverified deny rule reads exactly like a verified one.
+Four claims were checked and **all four are now verified**. Three are continuously enforced by a
+test. The fourth — RLS denying an anon-key client — stood as *verified in part* until 2026-08-28,
+because the `anon` role is created by Supabase and does not exist on a plain Postgres, so the
+migration was a no-op on every local run. It was executed against a real Supabase project on
+2026-08-28 and is recorded in §4. The gap was stated rather than glossed for as long as it existed,
+because an unverified deny rule reads exactly like a verified one.
 
 ---
 
@@ -57,26 +61,42 @@ header:
 `hasVoted` is a boolean about the caller and carries nothing identifying. Per-IP rate limiting keeps
 a salted hash in memory only: never written to Postgres, never logged (`apps/web/src/server/rate-limit.ts`).
 
-## 4. RLS denies an anon-key client on every table — ⚠️ verified in part
+## 4. RLS denies an anon-key client on every table — ✅ verified 2026-08-28
 
 `supabase/migrations/0003_rls_deny_anon.sql` enables row-level security on every table and grants the
 `anon` and `authenticated` roles nothing. It applies cleanly, and
 `pnpm migrations:verify-rollback` proves it reverses and re-applies.
 
-**What has not been checked**: that an anon-key client is actually denied. The `anon` and
-`authenticated` roles are created by Supabase and do not exist on a plain Postgres, so the migration
-guards on `pg_roles` and becomes a no-op locally. Docker is unavailable on the development machine,
-so the full Supabase stack could not be run.
+**Verified against a real Supabase project on 2026-08-28** (project in an EU region, Postgres 17.6),
+which is the first environment where the `anon` and `authenticated` roles have actually existed —
+they are created by Supabase and are absent from a plain Postgres, so the migration's `pg_roles`
+guard made it a no-op on every earlier run. Docker being unavailable on the development machine is
+what had blocked this until a real project existed.
 
-The application itself does not rely on RLS: `packages/db` connects as the owner over the Postgres
-wire protocol, and PostgREST — the surface an anon key would reach — is not used by any code path.
-RLS is defence in depth against the project's REST surface being enabled, not the mechanism the
-product's authorisation rests on. That is why this gap is a residual risk rather than a live hole,
-but it remains unverified.
+Observed state, all ten tables:
 
-**To close it**: against a real Supabase project, connect with the anon key and attempt
-`select`/`insert` on each of `players`, `player_ratings`, `tournaments`, `groups`, `pairs`, `voters`,
-`ballots`, `ballot_entries`, `group_final_standings`, `ranking_snapshots`. Every one must be denied.
+| Property                                             | Result                          |
+| ---------------------------------------------------- | ------------------------------- |
+| `relrowsecurity` (RLS enabled)                       | true on all 10                  |
+| `relforcerowsecurity` (applies to the owner too)     | true on all 10                  |
+| Policies in `pg_policies`                            | **0** — deny-by-default          |
+| `anon` / `authenticated` grants in `role_table_grants` | **none**                       |
+
+And the denial was executed rather than inferred. Under `SET LOCAL ROLE anon` and again under
+`SET LOCAL ROLE authenticated`, a `select` was attempted on `tournaments`, `ballots`,
+`ballot_entries`, `voters` and `players`, and on both aggregate views `group_ballot_counts` and
+`group_position_counts` — the two objects through which a vote count could leak (Risk R1). Every one
+failed with `42501 permission denied`. A write was attempted as `anon`
+(`insert into voters`) and also failed with `42501`.
+
+The views matter as much as the tables: a view is queried with its owner's privileges, so a grant
+there would have bypassed the table denials entirely. Both are denied.
+
+**Residual note**: this verifies the SQL-level denial, which is the mechanism PostgREST would run
+under. It does not exercise a PostgREST round trip with a literal anon API key, because the project's
+REST surface is not used by any code path — `packages/db` connects as the owner over the Postgres
+wire protocol. RLS here remains defence in depth against that surface being enabled later, and it is
+now confirmed to hold.
 
 ---
 

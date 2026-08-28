@@ -30,16 +30,6 @@ export function createPlayerRepository(sql: Sql): PlayerRepository {
       return rows.map(toPlayer);
     },
 
-    async findByExternalIds(externalIds) {
-      if (externalIds.length === 0) return [];
-      const rows = await sql<Row[]>`
-        select id, external_id, display_name, match_key, club
-        from players
-        where external_id = any(${sql.array([...externalIds])}::int[])
-      `;
-      return rows.map(toPlayer);
-    },
-
     async findById(id) {
       const rows = await sql<Row[]>`
         select id, external_id, display_name, match_key, club
@@ -65,9 +55,14 @@ export function createPlayerRepository(sql: Sql): PlayerRepository {
               club: p.club,
             })),
           )}
-          on conflict (external_id) do update
+          -- Conflict on match_key, never on external_id (FR-004 as amended 2026-08-28, migration
+          -- 0006). The sheet reuses ids across different people, so upserting on external_id would
+          -- silently collapse two real people into one row — and invisibly, because the row count
+          -- would simply stop growing. match_key is the only column that has ever identified a
+          -- person, and it is the only remaining UNIQUE constraint on the table.
+          on conflict (match_key) do update
             set display_name = excluded.display_name,
-                match_key    = excluded.match_key,
+                external_id  = excluded.external_id,
                 club         = excluded.club
           returning id, external_id, display_name, match_key, club,
                     -- xmax is 0 on a fresh insert and non-zero when the row was updated. It is the

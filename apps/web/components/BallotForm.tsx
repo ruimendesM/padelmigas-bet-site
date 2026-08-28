@@ -13,6 +13,8 @@ import {
   remainingCount,
   toSubmission,
 } from '@padelmigas/ui-logic';
+import { ApiRequestError } from '@padelmigas/client';
+import { api } from '../src/api.js';
 import { t } from '../src/i18n/index.js';
 
 /**
@@ -50,25 +52,18 @@ export function BallotForm({ group }: { group: GroupDto }) {
     setStatus('submitting');
     setError(null);
     try {
-      const response = await fetch(`/api/v1/groups/${group.id}/ballots`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(submission),
-      });
-
-      if (!response.ok) {
-        const failure = (await response.json()) as { code?: keyof typeof t.errors };
-        setError((failure.code && t.errors[failure.code]) || t.common.error);
-        setStatus('idle');
-        return;
-      }
+      // Through the generated client, never a hand-rolled fetch (Principle III).
+      await api.castBallot({ groupId: group.id, body: submission });
 
       setStatus('done');
       // Re-render the page from the server so the group's own results and `hasVoted` come from the
       // same reveal gate that governs every other reader (FR-020) — never from this response alone.
       router.refresh();
-    } catch {
-      setError(t.errors.NETWORK_ERROR);
+    } catch (failure) {
+      // The client raises every documented failure code as ApiRequestError, so the mapping to a
+      // human sentence is the same whether the request failed at the network or in a handler.
+      const code = failure instanceof ApiRequestError ? failure.code : 'NETWORK_ERROR';
+      setError(t.errors[code as keyof typeof t.errors] ?? t.common.error);
       setStatus('idle');
     }
   }

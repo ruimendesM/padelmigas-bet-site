@@ -43,16 +43,10 @@ export const publishTournament: Handler<PublishRequest, TournamentDetailDto> = a
         {
           name: pair.players[0].name,
           points: pair.players[0].points,
-          ...(pair.players[0].externalId === undefined
-            ? {}
-            : { externalId: pair.players[0].externalId }),
         },
         {
           name: pair.players[1].name,
           points: pair.players[1].points,
-          ...(pair.players[1].externalId === undefined
-            ? {}
-            : { externalId: pair.players[1].externalId }),
         },
       ],
     })),
@@ -61,19 +55,9 @@ export const publishTournament: Handler<PublishRequest, TournamentDetailDto> = a
   const matchKeys = [
     ...new Set(input.pairs.flatMap((pair) => pair.players.map((p) => toMatchKey(p.name)))),
   ].filter((key) => key.length > 0);
-  const externalIds = [
-    ...new Set(
-      input.pairs
-        .flatMap((pair) => pair.players.map((p) => p.externalId))
-        .filter((id): id is NonNullable<typeof id> => id !== undefined),
-    ),
-  ];
-
-  const [byName, byId] = await Promise.all([
-    deps.players.findByMatchKeys(matchKeys),
-    deps.players.findByExternalIds(externalIds),
-  ]);
-  const known = [...new Map([...byName, ...byId].map((p) => [p.id, p])).values()];
+  // Only the name route remains: since the 2026-08-28 amendment a payload cannot carry an explicit
+  // ranking id, because the sheet reuses ids across different people (FR-004, ADR-007 § Amendment).
+  const known = await deps.players.findByMatchKeys(matchKeys);
 
   const now = deps.clock.now();
   const derived = deriveLineup(input, known, now);

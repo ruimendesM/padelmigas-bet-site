@@ -1,5 +1,5 @@
 import type { RankingsSyncResponse } from '@padelmigas/contracts';
-import type { ExternalPlayerId, PlayerId } from '@padelmigas/contracts/common';
+import type { PlayerId } from '@padelmigas/contracts/common';
 import {
   domainError,
   isDomainError,
@@ -70,13 +70,16 @@ export const syncRankings: NullaryHandler<RankingsSyncResponse> = async (deps) =
     })),
   );
 
-  const idByExternalId = new Map<ExternalPlayerId, PlayerId>(
-    upsert.players.map((player) => [player.externalId, player.id]),
+  // Keyed by `matchKey`, not `externalId` (FR-004 as amended 2026-08-28). The sheet reuses ids
+  // across different people, so an id-keyed map silently collapses two players into one entry and
+  // both of their snapshots then target the same `(player_id, rated_on)` in a single insert.
+  const idByMatchKey = new Map<string, PlayerId>(
+    upsert.players.map((player) => [player.matchKey, player.id]),
   );
 
   const snapshots: RatingSnapshot[] = [];
   for (const snapshot of parsed.snapshots) {
-    const playerId = idByExternalId.get(snapshot.externalId);
+    const playerId = idByMatchKey.get(snapshot.matchKey);
     // A snapshot whose player did not come back from the upsert cannot be written; skipping it is
     // safe because the row is re-imported on the next run, and inventing a player id is not.
     if (!playerId) continue;

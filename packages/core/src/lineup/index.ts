@@ -19,7 +19,6 @@ import { resolvePlayers, type NameToResolve, type ResolvedPlayer } from '../matc
 export interface LineupInputPlayer {
   readonly name: string;
   readonly points: number;
-  readonly externalId?: ExternalPlayerId;
 }
 
 export interface LineupInputPair {
@@ -40,7 +39,8 @@ export interface LineupInput {
 
 export interface DerivedPairMember {
   readonly playerId: PlayerId;
-  readonly externalId: ExternalPlayerId;
+  /** Informational only and NOT unique (FR-004 as amended 2026-08-28). */
+  readonly externalId: ExternalPlayerId | null;
   readonly displayName: string;
   /** Captured now, at publish time, and never rewritten by a later ranking sync (FR-007). */
   readonly points: number;
@@ -188,11 +188,7 @@ export function deriveLineup(
   const namesToResolve: NameToResolve[] = [];
   for (const pair of input.pairs) {
     for (const player of pair.players) {
-      namesToResolve.push(
-        player.externalId === undefined
-          ? { name: player.name, points: player.points }
-          : { name: player.name, points: player.points, externalId: player.externalId },
-      );
+      namesToResolve.push({ name: player.name, points: player.points });
     }
   }
 
@@ -207,8 +203,8 @@ export function deriveLineup(
       resolution.ambiguous.map((entry) => ({
         path: 'players',
         message:
-          `O nome "${entry.matchKey}" corresponde a mais do que um ID do ranking ` +
-          `(${entry.externalIds.join(', ')}).`,
+          `O nome "${entry.matchKey}" aparece em mais do que uma linha do ranking ` +
+          `(IDs ${entry.externalIds.map((id) => id ?? '-').join(', ')}).`,
       })),
     );
   }
@@ -218,9 +214,7 @@ export function deriveLineup(
     const slot = miss.index % 2;
     issues.add(
       `pairs[${pairIndex}].players[${slot}].name`,
-      miss.externalId === undefined
-        ? `Nenhum jogador do ranking corresponde a "${miss.name}".`
-        : `Nenhum jogador do ranking tem o ID ${miss.externalId} (indicado para "${miss.name}").`,
+      `Nenhum jogador do ranking corresponde a "${miss.name}".`,
     );
   }
 

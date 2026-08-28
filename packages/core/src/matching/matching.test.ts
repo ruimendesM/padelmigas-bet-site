@@ -94,28 +94,15 @@ describe('resolvePlayers', () => {
     expect(result.unresolved.map((u) => u.index)).toEqual([0, 2]);
   });
 
-  it('uses an explicit externalId in preference to the name', () => {
-    // The disambiguation path: two identical names, resolved by ranking-list ID.
-    const result = resolvePlayers(
-      [{ name: 'Qualquer Nome Diferente', points: 443, externalId: 114 as ExternalPlayerId }],
-      known,
-    );
+  it('resolves by name alone, with no explicit-id escape hatch', () => {
+    // The disambiguation path was retired on 2026-08-28 (FR-004, ADR-007 § Amendment): it resolved
+    // ties through `external_id`, and the ranking sheet reuses ids across different people, so an
+    // explicit id could select the wrong person outright. A name that is not on the list is now
+    // simply unresolved -- there is no second route by which it could come back.
+    const result = resolvePlayers([{ name: 'Qualquer Nome Diferente', points: 443 }], known);
 
-    expect(result.unresolved).toEqual([]);
-    expect(result.resolved[0]).toMatchObject({ externalId: 114, isNew: false });
-  });
-
-  it('reports an explicit externalId that does not exist', () => {
-    const result = resolvePlayers(
-      [{ name: 'Duarte Vilaça', points: 1, externalId: 999_999 as ExternalPlayerId }],
-      known,
-    );
-
-    // The id was stated explicitly, so falling back to the name would resolve a different person.
     expect(result.resolved).toEqual([]);
-    expect(result.unresolved).toEqual([
-      { index: 0, name: 'Duarte Vilaça', externalId: 999_999 as ExternalPlayerId },
-    ]);
+    expect(result.unresolved).toEqual([{ index: 0, name: 'Qualquer Nome Diferente' }]);
   });
 
   it('rejects the whole set when two known players share a match key', () => {

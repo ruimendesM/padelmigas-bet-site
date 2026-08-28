@@ -4,15 +4,23 @@ import type { Player } from '../domain/index.js';
 /**
  * Player identity resolution (FR-004, ADR-007).
  *
- * The canonical identity is the ranking sheet's `ID`. A lineup carries names, so a name has to be
- * turned into an identity — and the rule the spec fixes is that this is done by **normalised exact
- * matching, never fuzzy matching**, and that a miss is reported for a human to fix rather than
- * resolved by a guess.
+ * The canonical identity is the **normalised name** (`matchKey`). A lineup carries names, so a name
+ * has to be turned into an identity — and the rule the spec fixes is that this is done by
+ * **normalised exact matching, never fuzzy matching**, and that a miss is reported for a human to
+ * fix rather than resolved by a guess.
  *
- * The empirical basis (research F2): 783 ranking rows with 0 duplicate names, and 24 of 24 lineup
- * names matching after case folding — the one mismatch was the capitalisation of a name particle.
- * Because uniqueness is a property of today's data and not a guarantee, this module also re-checks
- * for colliding match keys on every call and refuses to resolve anything when it finds one.
+ * The empirical basis (research F2, re-measured 2026-08-28): 784 ranking rows with 0 duplicate
+ * names, and 24 of 24 lineup names matching after case folding — the one mismatch was the
+ * capitalisation of a name particle. Because uniqueness is a property of today's data and not a
+ * guarantee, this module re-checks for colliding match keys on every call and refuses to resolve
+ * anything when it finds one.
+ *
+ * **Amended 2026-08-28 (FR-004, ADR-007 § Amendment)**: identity was previously the sheet's `ID`,
+ * and a payload could carry an explicit `externalId` to disambiguate two people sharing a name. That
+ * escape hatch is gone, because the sheet reuses ids across different people — 784 rows carry only
+ * 756 distinct ids — so an explicit id could select the wrong person outright. The consequence is
+ * accepted and recorded: two genuinely identical normalised names now abort the import with no
+ * payload-level override. The mitigation, when it first bites, is ADR-007's deferred admin merge UI.
  */
 
 /**
@@ -44,14 +52,13 @@ export function toMatchKey(name: string): string {
 export interface NameToResolve {
   readonly name: string;
   readonly points: number;
-  /** Ranking-list ID, supplied only to disambiguate identical names. */
-  readonly externalId?: ExternalPlayerId;
 }
 
 export interface ResolvedPlayer {
   readonly inputName: string;
   readonly playerId: Player['id'];
-  readonly externalId: ExternalPlayerId;
+  /** Informational only; NOT unique (FR-004 as amended 2026-08-28). */
+  readonly externalId: ExternalPlayerId | null;
   readonly displayName: string;
   /**
    * True when the ranking-list player had no local record yet.
@@ -67,14 +74,13 @@ export interface UnresolvedName {
   /** Index into the input array, so the caller can build a payload path like `pairs[3].players[1]`. */
   readonly index: number;
   readonly name: string;
-  /** Present when an explicit id was given and did not exist. */
-  readonly externalId?: ExternalPlayerId;
 }
 
 /** Two known players normalising to the same key — an import-blocking condition (ADR-007). */
 export interface AmbiguousMatchKey {
   readonly matchKey: string;
-  readonly externalIds: readonly ExternalPlayerId[];
+  /** Printed to help an organiser find the offending rows; ids do not identify anyone. */
+  readonly externalIds: readonly (ExternalPlayerId | null)[];
 }
 
 export interface ResolutionResult {
@@ -99,13 +105,11 @@ export function resolvePlayers(
   knownPlayers: readonly Player[],
 ): ResolutionResult {
   const byMatchKey = new Map<string, Player[]>();
-  const byExternalId = new Map<ExternalPlayerId, Player>();
 
   for (const player of knownPlayers) {
     const bucket = byMatchKey.get(player.matchKey);
     if (bucket) bucket.push(player);
     else byMatchKey.set(player.matchKey, [player]);
-    byExternalId.set(player.externalId, player);
   }
 
   const ambiguous: AmbiguousMatchKey[] = [];
@@ -124,24 +128,6 @@ export function resolvePlayers(
   const unresolved: UnresolvedName[] = [];
 
   names.forEach((entry, index) => {
-    if (entry.externalId !== undefined) {
-      // An explicit id is an assertion by the organiser. Falling back to the name when it misses
-      // would resolve a different person than the one they named.
-      const byId = byExternalId.get(entry.externalId);
-      if (byId) {
-        resolved.push({
-          inputName: entry.name,
-          playerId: byId.id,
-          externalId: byId.externalId,
-          displayName: byId.displayName,
-          isNew: false,
-        });
-      } else {
-        unresolved.push({ index, name: entry.name, externalId: entry.externalId });
-      }
-      return;
-    }
-
     const matchKey = toMatchKey(entry.name);
     // An empty key means the input was whitespace; there is nothing to match against.
     const candidates = matchKey.length === 0 ? undefined : byMatchKey.get(matchKey);

@@ -21,8 +21,11 @@ import type {
 
 export interface Player {
   readonly id: PlayerId;
-  /** The ranking sheet's `ID` column: canonical identity across syncs (FR-004). */
-  readonly externalId: ExternalPlayerId;
+  /**
+   * The ranking sheet's `ID` column. Informational only: NOT unique and NOT the identity key
+   * (FR-004 as amended 2026-08-28). `matchKey` is the canonical identity.
+   */
+  readonly externalId: ExternalPlayerId | null;
   readonly displayName: string;
   /** Normalised name produced by `core/matching`. Never derived in SQL (ADR-007). */
   readonly matchKey: string;

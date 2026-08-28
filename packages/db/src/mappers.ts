@@ -56,6 +56,12 @@ export function num(row: Row, column: string): number {
   return fail(column, 'a number', value);
 }
 
+export function numOrNull(row: Row, column: string): number | null {
+  const value = row[column];
+  if (value === null || value === undefined) return null;
+  return num(row, column);
+}
+
 export function instant(row: Row, column: string): Date {
   const value = row[column];
   if (value instanceof Date) return value;
@@ -98,7 +104,8 @@ function id<T extends string>(row: Row, column: string): T {
 export function toPlayer(row: Row): Player {
   return {
     id: id(row, 'id'),
-    externalId: num(row, 'external_id'),
+    // Nullable and non-unique since the 2026-08-28 amendment (FR-004, migration 0006).
+    externalId: numOrNull(row, 'external_id'),
     displayName: str(row, 'display_name'),
     matchKey: str(row, 'match_key'),
     club: strOrNull(row, 'club'),

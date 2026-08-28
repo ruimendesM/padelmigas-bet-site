@@ -26,7 +26,14 @@ export interface ParsedPlayer {
 }
 
 export interface ParsedSnapshot {
-  readonly externalId: ExternalPlayerId;
+  /**
+   * Identifies the player this rating belongs to.
+   *
+   * `matchKey`, not `externalId` (FR-004 as amended 2026-08-28). Keying a snapshot by the sheet's id
+   * was ambiguous the moment two rows shared one: both people resolved to a single player, and the
+   * import failed with `ON CONFLICT DO UPDATE command cannot affect row a second time`.
+   */
+  readonly matchKey: string;
   /** `YYYY-MM-DD`, parsed from the column header. */
   readonly ratedOn: string;
   readonly points: number;
@@ -192,8 +199,6 @@ export function parseRankingCsv(csv: string): ParsedRankings {
   const players: ParsedPlayer[] = [];
   const snapshots: ParsedSnapshot[] = [];
   const seenMatchKeys = new Map<string, ExternalPlayerId[]>();
-  const seenIds = new Set<number>();
-  const duplicateIds: number[] = [];
   let skippedRows = 0;
 
   for (const line of dataLines) {
@@ -212,12 +217,10 @@ export function parseRankingCsv(csv: string): ParsedRankings {
       continue;
     }
 
-    if (seenIds.has(externalId)) {
-      duplicateIds.push(externalId);
-      continue;
-    }
-    seenIds.add(externalId);
-
+    // A repeated `ID` is expected, not an error (FR-004 as amended 2026-08-28). The sheet is
+    // third-party maintained and reuses ids across different people; this loop previously skipped
+    // every repeat, so those people were dropped from the import entirely before the abort below
+    // ever fired. Identity is decided by `matchKey` alone.
     const matchKey = toMatchKey(displayName);
     const existing = seenMatchKeys.get(matchKey);
     if (existing) existing.push(externalId as ExternalPlayerId);
@@ -236,31 +239,27 @@ export function parseRankingCsv(csv: string): ParsedRankings {
       // means the cell is not a plain number and is dropped rather than reinterpreted.
       const points = Number(raw);
       if (!Number.isFinite(points) || !Number.isInteger(points) || points < 0) continue;
-      snapshots.push({
-        externalId: externalId as ExternalPlayerId,
-        ratedOn: column.ratedOn,
-        points,
-      });
+      snapshots.push({ matchKey, ratedOn: column.ratedOn, points });
     }
   }
 
   // Identity collisions abort the import. This is the whole point of ADR-007: a duplicate name means
   // no lineup name can be resolved with confidence, so importing anything would be a guess.
+  //
+  // Since the 2026-08-28 amendment this is the *only* guard on identity — the `external_id`
+  // uniqueness check that used to sit beside it is gone, because the source violates it by design.
+  // A regression here merges two real people silently, so it is load-bearing, not defensive.
   const collisions = [...seenMatchKeys.entries()].filter(([, ids]) => ids.length > 1);
-  if (collisions.length > 0 || duplicateIds.length > 0) {
+  if (collisions.length > 0) {
     throw new DomainError(
       'DUPLICATE_MATCH_KEY',
       'A folha de ranking tem identidades ambíguas. A importação foi abortada e nada foi escrito.',
-      [
-        ...collisions.map(([matchKey, ids]) => ({
-          path: 'csv',
-          message: `O nome "${matchKey}" aparece em mais do que uma linha (IDs ${ids.join(', ')}).`,
-        })),
-        ...duplicateIds.map((id) => ({
-          path: 'csv',
-          message: `O ID ${id} aparece em mais do que uma linha.`,
-        })),
-      ],
+      collisions.map(([matchKey, ids]) => ({
+        path: 'csv',
+        // The ids are printed to help an organiser find the offending rows, not because they
+        // identify anyone.
+        message: `O nome "${matchKey}" aparece em mais do que uma linha (IDs ${ids.join(', ')}).`,
+      })),
     );
   }
 

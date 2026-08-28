@@ -26,12 +26,6 @@ import {
 export const lineupPlayer = z.object({
   name: z.string().min(1, 'O nome do jogador não pode estar vazio.'),
   points: z.number().int().min(0),
-  /**
-   * Ranking-list ID. Required only to disambiguate identical names — the ranking list has none today
-   * (F2), but the check runs on every import and an organiser needs a way to resolve one when it
-   * appears.
-   */
-  externalId: externalPlayerId.optional(),
 });
 export type LineupPlayer = z.infer<typeof lineupPlayer>;
 
@@ -130,7 +124,8 @@ export const previewGroup = z.object({
 
 export const resolvedPlayer = z.object({
   inputName: z.string(),
-  externalId: externalPlayerId,
+  /** Informational only and NOT unique; identity is the normalised name (FR-004, amended). */
+  externalId: externalPlayerId.nullable(),
   displayName: z.string(),
   /** True when this ranking-list player had no local record yet — a new person, not a new identity. */
   isNew: z.boolean(),

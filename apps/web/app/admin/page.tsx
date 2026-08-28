@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import type { LineupPreviewDto } from '@padelmigas/contracts';
+import { ApiRequestError, type C } from '@padelmigas/client';
 import { formatPairName, formatPoints, formatStartsAt } from '@padelmigas/ui-logic';
+import { api } from '../../src/api.js';
 import { t } from '../../src/i18n/index.js';
 
 /**
@@ -14,15 +16,15 @@ import { t } from '../../src/i18n/index.js';
  * has no cheap undo, so paste-and-publish is made structurally impossible rather than discouraged.
  *
  * A client component because it is a form with three states and no shareable URL; nothing on it is
- * public, and it reaches the API over HTTP through the same `/api/v1` surface everyone else uses.
+ * public, and it reaches the API over HTTP through the same `/api/v1` surface everyone else uses —
+ * via the generated client in `src/api.ts`, never a hand-rolled fetch (Principle III). The one
+ * exception is sign-in below, which is host plumbing outside the product API (ADR-002).
  */
 
 interface Issue {
   path: string;
   message: string;
 }
-
-type Failure = { code?: keyof typeof t.errors; message?: string; issues?: Issue[] };
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
@@ -34,9 +36,23 @@ export default function AdminPage() {
   const [busy, setBusy] = useState<'none' | 'preview' | 'publish' | 'sync' | 'signin'>('none');
   const [notice, setNotice] = useState<string | null>(null);
 
-  function fail(failure: Failure): void {
-    setError((failure.code && t.errors[failure.code]) || failure.message || t.common.error);
-    setIssues(failure.issues ?? []);
+  /**
+   * Renders a failure from the generated client.
+   *
+   * `ApiRequestError` carries the documented `code`, the server's message and its issue list, so
+   * every failure path — network included, which arrives as `NETWORK_ERROR` — is one shape
+   * (Principle III).
+   */
+  function fail(failure: unknown): void {
+    if (failure instanceof ApiRequestError) {
+      setError(
+        t.errors[failure.code as keyof typeof t.errors] || failure.message || t.common.error,
+      );
+      setIssues(failure.issues as Issue[]);
+      return;
+    }
+    setError(t.errors.NETWORK_ERROR);
+    setIssues([]);
   }
 
   /** Any edit retracts the preview: what was validated is no longer what would be published. */
@@ -86,20 +102,10 @@ export default function AdminPage() {
     setError(null);
     setIssues([]);
     try {
-      const response = await fetch('/api/v1/admin/tournaments/preview', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(parsed),
-      });
-      const payloadBody = (await response.json()) as LineupPreviewDto | Failure;
-      if (!response.ok) {
-        setPreview(null);
-        fail(payloadBody as Failure);
-        return;
-      }
-      setPreview(payloadBody as LineupPreviewDto);
-    } catch {
-      setError(t.errors.NETWORK_ERROR);
+      setPreview(await api.previewLineup({ body: parsed as C.PreviewLineupBody }));
+    } catch (failure) {
+      setPreview(null);
+      fail(failure);
     } finally {
       setBusy('none');
     }
@@ -112,22 +118,16 @@ export default function AdminPage() {
     setBusy('publish');
     setError(null);
     try {
-      const response = await fetch('/api/v1/admin/tournaments', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      await api.publishTournament({
         // `confirm` is added here, at the click, and is never part of the pasted payload: the
         // confirmation has to come from the organiser's action, not from what they pasted (FR-002).
-        body: JSON.stringify({ ...(parsed as object), confirm: true }),
+        body: { ...(parsed as object), confirm: true } as C.PublishTournamentBody,
       });
-      if (!response.ok) {
-        fail((await response.json()) as Failure);
-        return;
-      }
       setNotice(t.admin.published);
       setPreview(null);
       setPayload('');
-    } catch {
-      setError(t.errors.NETWORK_ERROR);
+    } catch (failure) {
+      fail(failure);
     } finally {
       setBusy('none');
     }
@@ -137,26 +137,17 @@ export default function AdminPage() {
     setBusy('sync');
     setError(null);
     try {
-      const response = await fetch('/api/v1/admin/rankings/sync', { method: 'POST' });
-      const report = (await response.json()) as {
-        playersCreated?: number;
-        playersUpdated?: number;
-        stale?: boolean;
-      } & Failure;
-      if (!response.ok) {
-        fail(report);
-        return;
-      }
+      const report = await api.syncRankings();
       setNotice(
         [
-          t.admin.syncReport(report.playersCreated ?? 0, report.playersUpdated ?? 0),
+          t.admin.syncReport(report.playersCreated, report.playersUpdated),
           report.stale ? t.admin.syncStale : '',
         ]
           .filter(Boolean)
           .join(' '),
       );
-    } catch {
-      setError(t.errors.NETWORK_ERROR);
+    } catch (failure) {
+      fail(failure);
     } finally {
       setBusy('none');
     }

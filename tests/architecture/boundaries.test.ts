@@ -149,11 +149,22 @@ describe('apps/web reaches the API only through the generated client', () => {
   it('has no hand-rolled fetch to /api/v1 outside packages/client', () => {
     // The constitution forbids hand-rolled fetch calls and hard-coded URLs outside the generated
     // client (Principle III). grep is the right tool: this is a textual property, not a graph one.
+    //
+    // Scoped to `/api/v1/` — the versioned product API — rather than all of `/api/`. The one route
+    // outside it is `POST /api/admin/session`, the organiser sign-in: it is host plumbing that
+    // exchanges a password for a cookie, not a product endpoint, so it is deliberately absent from
+    // `packages/contracts/src/endpoints.ts` and therefore from the generated client (ADR-002).
+    // Matching bare `/api/` flagged it and made this assertion stricter than both its own name and
+    // the design it is guarding.
+    //
+    // NOTE: `git grep` searches tracked files only. This assertion is therefore vacuous for any file
+    // that has not been committed — which is exactly why it went green through the whole of
+    // phases 1-7, when the tree was still untracked, and only started reporting on 2026-08-28.
     let matches = '';
     try {
       matches = execFileSync(
         'git',
-        ['grep', '-n', '-E', 'fetch\\([\'"`]/api/', '--', 'apps/', 'packages/'],
+        ['grep', '-n', '-E', 'fetch\\([\'"`]/api/v1/', '--', 'apps/', 'packages/'],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
       ).trim();
     } catch {

@@ -642,6 +642,7 @@ paths:
                     type: integer
                     exclusiveMinimum: true
                     minimum: 0
+                    nullable: true
                   name:
                     type: string
                   club:
@@ -830,6 +831,7 @@ paths:
                           type: integer
                           exclusiveMinimum: true
                           minimum: 0
+                          nullable: true
                         displayName:
                           type: string
                         isNew:
@@ -911,10 +913,6 @@ paths:
                               points:
                                 type: integer
                                 minimum: 0
-                              externalId:
-                                type: integer
-                                exclusiveMinimum: true
-                                minimum: 0
                             required:
                               - name
                               - points
@@ -926,10 +924,6 @@ paths:
                                 minLength: 1
                               points:
                                 type: integer
-                                minimum: 0
-                              externalId:
-                                type: integer
-                                exclusiveMinimum: true
                                 minimum: 0
                             required:
                               - name
@@ -1226,10 +1220,6 @@ paths:
                               points:
                                 type: integer
                                 minimum: 0
-                              externalId:
-                                type: integer
-                                exclusiveMinimum: true
-                                minimum: 0
                             required:
                               - name
                               - points
@@ -1241,10 +1231,6 @@ paths:
                                 minLength: 1
                               points:
                                 type: integer
-                                minimum: 0
-                              externalId:
-                                type: integer
-                                exclusiveMinimum: true
                                 minimum: 0
                             required:
                               - name

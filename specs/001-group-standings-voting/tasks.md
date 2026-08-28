@@ -208,7 +208,7 @@ Supabase client.
 - [ ] T098 Execute quickstart scenarios V1–V6 manually and record the outcomes in `specs/001-group-standings-voting/quickstart.md` (SC-004, SC-007)
 - [ ] T099 Run a timed first-use walkthrough with two people who have not seen the site, recording time-to-submitted-ballot on a phone in `docs/usability/2026-ballot-timing.md`; fix any step that pushes the median past 60 seconds (SC-002)
 - [X] T100 [P] Add the scheduled rankings sync in `apps/web/vercel.json`, authenticating with a bearer `CRON_SECRET` accepted by the sync route per T049 (FR-004)
-- [ ] T101 Security review recorded in `docs/security/001-review.md`: no service-role key in any client bundle, `no-store` present on every voter-dependent response, RLS verified to deny an anon-key client on every table, and no voter identifier reachable from any public path (FR-022, SC-006)
+- [X] T101 Security review recorded in `docs/security/001-review.md`: no service-role key in any client bundle, `no-store` present on every voter-dependent response, RLS verified to deny an anon-key client on every table, and no voter identifier reachable from any public path (FR-022, SC-006)
 
 ---
 
@@ -222,18 +222,42 @@ Rationale and trade-offs: [ADR-007](../../docs/adr/ADR-007-player-identity-ranki
 real ranking sheet aborts, so no tournament can be published at all. The sheet is third-party
 maintained and cannot be corrected upstream.
 
-- [ ] T102 Migration `0006_external_id_not_unique.sql` with its rollback: drop the UNIQUE constraint on `players.external_id` and make the column nullable, leaving `players.match_key` UNIQUE as the sole identity key; rollback must be executable on a database holding duplicate `external_id` values, or fail loudly rather than silently discard rows (FR-004, data-model § `players`)
-- [ ] T103 Verify the rollback actually reverses and re-applies via `pnpm migrations:verify-rollback`, which is the gate that caught the unexecutable rollback in `0003` (Principle: Quality Gates)
-- [ ] T104 [P] Contract test: an import whose source rows carry duplicate `external_id` values but distinct normalised names succeeds and creates one player per name (FR-004)
-- [ ] T105 [P] Contract test: an import whose source rows produce two identical `match_key` values still aborts with `DUPLICATE_MATCH_KEY` and leaves the database untouched — this check is now the sole guard on identity (FR-004, quickstart V6.3)
-- [ ] T106 [P] Contract test: re-running the import is idempotent — no duplicate players, no duplicate ratings, snapshots rewritten (quickstart V6.1)
-- [ ] T107 Make `externalId` nullable in the `playerDetail` and `resolvedPlayer` response schemas in `packages/contracts` (`players.ts`, `tournaments.ts`). Both currently declare it required and non-nullable, so a player row without one would fail response validation the moment the column becomes nullable (Principle III, FR-004)
-- [ ] T108 Retire the explicit `externalId` disambiguation path in **both** `packages/contracts` (the optional `externalId` on `lineupPlayer`) and `packages/core/matching`: it resolved ties by a field that is no longer unique, so it can now select the wrong person. Removing it means two genuinely identical normalised names abort with no payload-level override — the accepted cost recorded in ADR-007 § Amendment (FR-004)
-- [ ] T109 Regenerate the client and the OpenAPI document with `pnpm generate:client && pnpm generate:openapi` after T107 and T108, and confirm `pnpm openapi:check` passes. Contracts are the source of truth and both artifacts are generated from them; skipping this fails CI (Principle III)
-- [ ] T110 Remove the `external_id` uniqueness precondition from `packages/core/rankings/parse.ts` so a repeated identifier is no longer an import failure, keeping the `match_key` collision check exactly as written (FR-004)
-- [ ] T111 Change the players repository in `packages/db` to upsert on `match_key` rather than `external_id`, so a repeated identifier cannot merge two people (data-model § `players`)
-- [ ] T112 Update the unit tests for `core/matching`, `core/rankings/parse` and the fixtures that assumed a unique `external_id`, keeping branch coverage on the gated modules at 100% (Principle: Quality Gates)
-- [ ] T113 Run the real import against the live sheet and record the outcome — row count, players created, ratings, snapshots — then re-run to confirm idempotence (quickstart V6.1, closes the import half of T098)
+- [X] T102 Migration `0006_external_id_not_unique.sql` with its rollback: drop the UNIQUE constraint on `players.external_id` and make the column nullable, leaving `players.match_key` UNIQUE as the sole identity key; rollback must be executable on a database holding duplicate `external_id` values, or fail loudly rather than silently discard rows (FR-004, data-model § `players`)
+- [X] T103 Verify the rollback actually reverses and re-applies via `pnpm migrations:verify-rollback`, which is the gate that caught the unexecutable rollback in `0003` (Principle: Quality Gates)
+- [X] T104 [P] Contract test: an import whose source rows carry duplicate `external_id` values but distinct normalised names succeeds and creates one player per name (FR-004)
+- [X] T105 [P] Contract test: an import whose source rows produce two identical `match_key` values still aborts with `DUPLICATE_MATCH_KEY` and leaves the database untouched — this check is now the sole guard on identity (FR-004, quickstart V6.3)
+- [X] T106 [P] Contract test: re-running the import is idempotent — no duplicate players, no duplicate ratings, snapshots rewritten (quickstart V6.1)
+- [X] T107 Make `externalId` nullable in the `playerDetail` and `resolvedPlayer` response schemas in `packages/contracts` (`players.ts`, `tournaments.ts`). Both currently declare it required and non-nullable, so a player row without one would fail response validation the moment the column becomes nullable (Principle III, FR-004)
+- [X] T108 Retire the explicit `externalId` disambiguation path in **both** `packages/contracts` (the optional `externalId` on `lineupPlayer`) and `packages/core/matching`: it resolved ties by a field that is no longer unique, so it can now select the wrong person. Removing it means two genuinely identical normalised names abort with no payload-level override — the accepted cost recorded in ADR-007 § Amendment (FR-004)
+- [X] T109 Regenerate the client and the OpenAPI document with `pnpm generate:client && pnpm generate:openapi` after T107 and T108, and confirm `pnpm openapi:check` passes. Contracts are the source of truth and both artifacts are generated from them; skipping this fails CI (Principle III)
+- [X] T110 Remove the `external_id` uniqueness precondition from `packages/core/rankings/parse.ts` so a repeated identifier is no longer an import failure, keeping the `match_key` collision check exactly as written (FR-004)
+- [X] T111 Change the players repository in `packages/db` to upsert on `match_key` rather than `external_id`, so a repeated identifier cannot merge two people (data-model § `players`)
+- [X] T112 Update the unit tests for `core/matching`, `core/rankings/parse` and the fixtures that assumed a unique `external_id`, keeping branch coverage on the gated modules at 100% (Principle: Quality Gates)
+- [X] T113 Run the real import against the live sheet and record the outcome — row count, players created, ratings, snapshots — then re-run to confirm idempotence (quickstart V6.1, closes the import half of T098)
+
+---
+
+## Phase 9: Close the Principle III violation the boundary gate had never reported (2026-08-28)
+
+`tests/architecture/boundaries.test.ts` shells out to `git grep`, which searches **tracked files
+only**. The source tree was untracked for the whole of phases 1-7, so this assertion passed
+vacuously every time it ran and never once inspected the code it guards. Committing the tree on
+2026-08-28 switched it on, and it immediately reported four hand-rolled `fetch` calls to `/api/v1`
+that Principle III forbids.
+
+The gate was also stricter than its own name: it matched bare `/api/`, which flags
+`POST /api/admin/session` — the organiser sign-in, which is host plumbing outside the versioned
+product API by design (ADR-002) and therefore absent from the generated client.
+
+- [X] T114 Narrow the boundary assertion to `/api/v1/` so it matches its own name and stops flagging the documented `/api/admin/session` exception, and record in the test that `git grep` makes it vacuous for untracked files — the reason it never reported for seven phases (Principle III)
+- [X] T115 Add `apps/web/src/api.ts`: one module-level generated-client instance built from `createApi` and `WEB_API_BASE_URL`, so interactive components have a single typed entry point to the product API (Principle III, SC-010)
+- [X] T116 Route `apps/web/components/BallotForm.tsx` through `api.castBallot`, mapping `ApiRequestError.code` to the translated message instead of decoding the error body by hand (FR-010, Principle III)
+- [X] T117 Route the three organiser calls in `apps/web/app/admin/page.tsx` — preview, publish, rankings sync — through the generated client, and rewrite `fail()` to take an `ApiRequestError` so network and handler failures share one shape (FR-002, FR-004, Principle III)
+
+### Task count (Principle III)
+
+4 tasks. Not new scope: this is a pre-existing violation of an existing principle, found only because
+committing the tree made an existing gate functional for the first time.
 
 ### Task count (amendment)
 
@@ -324,7 +348,8 @@ first release rather than a follow-up.
 
 ### Task count
 
-113 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12.
+117 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12,
+Principle III 4.
 
 The Amendment phase (T102–T113) was added on 2026-08-28, after Phase 7, when the first import against
 the real ranking sheet revealed that the source's `ID` column is not unique. It is a correctness fix

@@ -79,9 +79,6 @@ export interface PlayerRepository {
    */
   findByMatchKeys(matchKeys: readonly string[]): Promise<readonly Player[]>;
 
-  /** Looks up players by ranking-sheet id, used when a payload disambiguates an identical name. */
-  findByExternalIds(externalIds: readonly ExternalPlayerId[]): Promise<readonly Player[]>;
-
   findById(id: PlayerId): Promise<Player | null>;
 
   /**
