@@ -5,8 +5,11 @@ import { createApi, WEB_API_BASE_URL } from '@padelmigas/ui-logic';
  *
  * The constitution requires clients to consume the generated client rather than hand-rolled `fetch`
  * calls, so that a contract change becomes a type error here instead of a runtime surprise in
- * production. `tests/architecture/boundaries.test.ts` greps for `fetch('/api/v1/...')` outside
- * `packages/client` and fails the build when one reappears.
+ * production. `tests/architecture/boundaries.test.ts` greps for a direct call to a versioned API
+ * path outside `packages/client` and fails the build when one reappears.
+ *
+ * That grep matches source text, so it cannot tell code from prose: spelling the forbidden pattern
+ * out literally in a comment — even to explain it — trips the rule. Describe it, do not quote it.
  *
  * The client is a value, not a hook: it holds no state beyond its base URL, so a module-level
  * instance is correct and avoids threading a provider through every interactive component. A future
