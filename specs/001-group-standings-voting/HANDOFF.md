@@ -4,6 +4,13 @@
 
 Written for the next agent picking up `/speckit-implement`. Read this, then `tasks.md`.
 
+> **Historical as of 2026-08-28 — the counts below are out of date.** Two more phases have landed
+> since (the FR-004 identity amendment, and the Principle III fix), the state is now 114/127, and
+> T101 is closed. **If you are here to deploy, read
+> [`docs/deploy/HANDOFF-vps.md`](../../docs/deploy/HANDOFF-vps.md) instead.** What is still accurate
+> in this file: the "How to get running" section, the three spec amendments, the bugs the gates
+> caught, and the conventions at the end.
+
 > **Second session update (2026-08-27).** Everything below still holds. The four tasks left open are
 > T095 (load test), T098 (manual quickstart), T099 (usability timing) and T101 (the RLS half of the
 > security review) — all four need a deployed environment or other people, and each has a document
