@@ -67,8 +67,13 @@ reported until something tries to use it:
 sudo -n systemctl restart padelmigas.service; echo "exit: $?"
 ```
 
-`Failed to restart` with exit 1 is the expected answer before the first deploy (the unit exists but
-has no release yet). `sudo: a password is required` means the rule did not match.
+`Failed to restart ... Unit padelmigas.service not found.` with exit 5 is the expected answer before
+the unit is installed, and it is a pass: sudo matched the rule and ran the command without asking for
+anything. `sudo: a password is required` is the failure — it means the rule did not match.
+
+`sudo -n true` is *not* a valid check here and will report that a password is required even when the
+rule is correct. The grant is one command wide by design, so every other command falls back to normal
+sudo — including reading the rule file itself.
 
 Scoped to that one unit on purpose: the deploy key is held by GitHub, so whatever it can run is
 what an attacker with that key can run.
