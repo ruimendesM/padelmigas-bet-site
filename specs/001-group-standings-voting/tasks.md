@@ -207,7 +207,7 @@ Supabase client.
 - [X] T097 [P] Update `README.md` with real run instructions and amend any ADR in `docs/adr/` whose decision changed during implementation
 - [ ] T098 Execute quickstart scenarios V1–V6 manually and record the outcomes in `specs/001-group-standings-voting/quickstart.md` (SC-004, SC-007)
 - [ ] T099 Run a timed first-use walkthrough with two people who have not seen the site, recording time-to-submitted-ballot on a phone in `docs/usability/2026-ballot-timing.md`; fix any step that pushes the median past 60 seconds (SC-002)
-- [X] T100 [P] Add the scheduled rankings sync in `apps/web/vercel.json`, authenticating with a bearer `CRON_SECRET` accepted by the sync route per T049 (FR-004)
+- [X] ~~T100~~ **Retired 2026-08-28 by T126** — the Vercel cron it added is replaced by the systemd timer in T123. `apps/web/vercel.json` is deleted; leaving it would have invited a second scheduler firing the same route (ADR-010 § Amendment, FR-004)
 - [X] T101 Security review recorded in `docs/security/001-review.md`: no service-role key in any client bundle, `no-store` present on every voter-dependent response, RLS verified to deny an anon-key client on every table, and no voter identifier reachable from any public path (FR-022, SC-006)
 
 ---
@@ -275,7 +275,7 @@ first.
 - [X] T123 Add `deploy/padelmigas-rankings.service` and `.timer`: weekly systemd timer calling `/api/v1/admin/rankings/sync` with the bearer `CRON_SECRET`, replacing the Vercel cron. A timer fails silently, so it needs a failure path that reaches a human — ADR-010 § Amendment names this as a cost of the move (FR-004)
 - [ ] T124 Add `.github/workflows/deploy.yml`: gates, then build, then rsync the standalone bundle, then `systemctl restart`. Mirrors the deploy idiom already used for the other two services on that host. Deploys only after CI passes on `main`
 - [ ] T125 Keep the previous release on disk and make the restart switch a symlink, so a bad deploy is reversible. ADR-010 § Amendment records the loss of platform rollback as a cost of leaving Vercel; this is the mitigation, and without it there is none
-- [ ] T126 Delete `apps/web/vercel.json` and retire T100, which configured the Vercel cron the timer in T123 replaces. Leaving it invites a second scheduler firing the same route
+- [X] T126 Delete `apps/web/vercel.json` and retire T100, which configured the Vercel cron the timer in T123 replaces. Leaving it invites a second scheduler firing the same route
 - [ ] T127 Write `docs/deploy/vps.md`: one-time host setup (Node runtime, `/etc/padelmigas/env`, unit installation, certificate) and the runbook for a deploy, a rollback, and a failed sync
 
 ### Task count (deploy)

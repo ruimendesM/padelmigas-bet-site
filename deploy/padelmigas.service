@@ -27,9 +27,13 @@ EnvironmentFile=/etc/padelmigas/env
 
 # Bound to loopback: nginx is the only thing that may reach it, which is what makes the
 # X-Forwarded-For rule in deploy/nginx.conf the sole source of client addresses (Risk R2).
+#
+# 3100, not the Next.js default: 127.0.0.1:3000 is already held by another node process on this
+# host, and 8080/8090 by the JVM service and the WhatsApp gateway. Two services racing for a port
+# fail at start, and whichever loses stays down until someone notices.
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
-Environment=PORT=3000
+Environment=PORT=3100
 
 Restart=on-failure
 RestartSec=5s

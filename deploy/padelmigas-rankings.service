@@ -23,7 +23,7 @@ Group=padelmigas
 # broken — precisely the silent failure this unit exists to avoid. The token goes through a header on
 # a loopback request, so it never appears in a URL, a proxy log, or the journal.
 ExecStart=/usr/bin/curl --fail-with-body --silent --show-error --max-time 120 \
-    -X POST http://127.0.0.1:3000/api/v1/admin/rankings/sync \
+    -X POST http://127.0.0.1:3100/api/v1/admin/rankings/sync \
     -H "Authorization: Bearer ${CRON_SECRET}"
 
 NoNewPrivileges=true
