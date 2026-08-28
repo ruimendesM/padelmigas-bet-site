@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "composite": true,
+    // `${configDir}` resolves against the *extending* package, not this file (TS 5.5+). Without it
+    // every package would need its own copy of these three paths.
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/dist",
+    "tsBuildInfoFile": "${configDir}/dist/.tsbuildinfo"
+  },
+  "include": ["${configDir}/src/**/*.ts"],
+  "exclude": ["${configDir}/node_modules", "${configDir}/dist", "${configDir}/**/*.test.ts"]
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "@padelmigas/tsconfig/library.json",
+  "include": ["src/**/*.ts"]
+}

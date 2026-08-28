@@ -1,0 +1,48 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "VOTER_COOKIE_SECRET",
+    "ADMIN_PASSWORD_HASH",
+    "RANKINGS_CSV_URL",
+    "CRON_SECRET",
+    "RATE_LIMIT_SALT",
+    "TEST_DATABASE_URL"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "test:unit": {
+      "outputs": ["coverage/**"]
+    },
+    "test:contract": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
+    "boundaries": {
+      "outputs": []
+    },
+    "migrations:check": {
+      "outputs": []
+    }
+  }
+}

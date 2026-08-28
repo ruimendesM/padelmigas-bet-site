@@ -15,14 +15,21 @@ works end to end once those tasks are done.
 
 Server-only variables in `apps/web/.env.local` — never prefixed `NEXT_PUBLIC_`:
 
-| Variable | Purpose |
-|----------|---------|
-| `SUPABASE_URL` | Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | The only data-access key; server-only (ADR-003) |
-| `VOTER_COOKIE_SECRET` | Signing key for the voter cookie (ADR-004) |
-| `ADMIN_PASSWORD_HASH` | Argon2id hash gating the organiser area (FR-006) |
-| `RANKINGS_CSV_URL` | Public CSV export of the club ranking sheet |
-| `CRON_SECRET` | Bearer secret the scheduler uses to call the rankings-sync route |
+| Variable              | Purpose                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | Supabase Postgres **pooler** connection string — the only data-access credential; server-only (ADR-003) |
+| `VOTER_COOKIE_SECRET` | Signing key for the voter cookie (ADR-004)                                                              |
+| `ADMIN_PASSWORD_HASH` | Argon2id hash gating the organiser area (FR-006)                                                        |
+| `RANKINGS_CSV_URL`    | Public CSV export of the club ranking sheet                                                             |
+| `CRON_SECRET`         | Bearer secret the scheduler uses to call the rankings-sync route                                        |
+| `RATE_LIMIT_SALT`     | Salt for the in-memory IP hash used by ballot rate limiting (Risk R2)                                   |
+
+> **Amended 2026-08-27 during implementation.** This table previously named `SUPABASE_URL` and
+> `SUPABASE_SERVICE_ROLE_KEY`. Both are gone: the driver is now `postgres` (postgres.js) over
+> Supabase's pooler rather than `@supabase/supabase-js`, because PostgREST cannot open the
+> multi-statement transactions that the publish (FR-007) and ballot (FR-010) paths require. One
+> connection string replaces the pair. See the amendment in
+> [ADR-003](../../docs/adr/ADR-003-supabase-postgres-server-only.md).
 
 A missing or empty variable must fail startup loudly rather than degrade — no silent fallbacks.
 
@@ -30,7 +37,8 @@ A missing or empty variable must fail startup loudly rather than degrade — no 
 
 ```bash
 pnpm install
-pnpm supabase db push          # apply supabase/migrations to the target database
+pnpm generate:client           # emit packages/client from the Zod contracts
+pnpm db:push                   # apply supabase/migrations to the target database
 pnpm rankings:sync             # import ~783 players + dated rating snapshots
 pnpm dev                       # http://localhost:3000
 ```
@@ -106,3 +114,24 @@ pair id. **Expect**: every displayed number matches exactly, and repeated reload
    reports staleness and uses the last stored snapshot; it does not invent players.
 3. Feed a CSV containing two rows whose names normalise identically. **Expect**:
    `409 DUPLICATE_MATCH_KEY`, import aborted, database untouched.
+
+---
+
+## Outcomes — 2026-08-27
+
+**Status: not yet executed manually.** V1–V6 need a real Supabase project and the real ranking sheet
+URL, neither of which exists yet. Nothing below is recorded as passed on the strength of a local run.
+
+What *is* verified, and where, so the manual pass is a confirmation rather than the first check:
+
+| Scenario | Automated coverage today | Still needs a manual run for |
+|----------|--------------------------|------------------------------|
+| V1 Publish | `tests/contract/admin-preview.test.ts`, `tests/contract/admin-publish.test.ts` — every failure code, points captured at publish, nothing persisted on rejection. `apps/web/tests/e2e/publish-lineup.spec.ts` drives the browser flow. | The real ranking sheet: that 24 pasted names resolve against 783 real rows (SC-003). |
+| V2 Vote and reveal | `tests/contract/cast-ballot.test.ts`, `tests/contract/tournament-detail.test.ts` — including two concurrent submissions producing one ballot, and per-group independence. `apps/web/tests/e2e/vote-and-reveal.spec.ts`. | Perceived speed on a real phone over a real network (SC-005). |
+| V3 Percentage audit | `packages/core/src/scoring/scoring.test.ts` (100% branch), `tests/contract/group-results.test.ts` — the full tie-break chain, rounding only at render. | A human reading the rendered percentages against hand-counted ballots. |
+| V4 Window close | `packages/core/src/window/window.test.ts` — the boundary instant asserted directly. `tests/contract/cast-ballot.test.ts` refuses a ballot exactly at `startsAt`. | The client-clock half: changing the *device* clock, which no server-side test can simulate (SC-007). |
+| V5 History and identity | `tests/contract/player-detail.test.ts` — one record, continuous history across three tournaments. | Two tournaments sharing a real player from the real sheet (SC-008). |
+| V6 Rankings sync | `tests/contract/admin-rankings-sync.test.ts` — idempotent re-run, staleness fallback, `DUPLICATE_MATCH_KEY` aborting with the database untouched. | The real sheet's actual shape and its redirect behaviour (F1). |
+
+The gap in every row is the same one: real data and a real deployment. Record the outcomes here when
+that environment exists.

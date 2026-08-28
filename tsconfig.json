@@ -1,0 +1,23 @@
+{
+  "extends": "./packages/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@padelmigas/contracts": ["./packages/contracts/src/index.ts"],
+      "@padelmigas/contracts/*": ["./packages/contracts/src/*"],
+      "@padelmigas/core": ["./packages/core/src/index.ts"],
+      "@padelmigas/core/*": ["./packages/core/src/*"],
+      "@padelmigas/api": ["./packages/api/src/index.ts"],
+      "@padelmigas/api/*": ["./packages/api/src/*"],
+      "@padelmigas/db": ["./packages/db/src/index.ts"],
+      "@padelmigas/db/*": ["./packages/db/src/*"],
+      "@padelmigas/client": ["./packages/client/src/index.ts"],
+      "@padelmigas/client/*": ["./packages/client/src/*"],
+      "@padelmigas/ui-logic": ["./packages/ui-logic/src/index.ts"],
+      "@padelmigas/ui-logic/*": ["./packages/ui-logic/src/*"]
+    }
+  },
+  "include": ["scripts/**/*.ts", "tests/**/*.ts", "*.ts", "*.cjs"],
+  "exclude": ["node_modules", "dist", "**/.next", "coverage"]
+}

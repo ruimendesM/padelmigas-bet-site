@@ -24,8 +24,8 @@ swapping adapters, with zero changes to domain code.
 **Language/Version**: TypeScript 5.x, `strict: true`, Node 22 LTS runtime
 
 **Primary Dependencies**: Next.js 15 (App Router, React 19) for web host; Zod for contracts and
-validation; TanStack Query for client data fetching; `@supabase/supabase-js` confined to
-`packages/db`; `jose` for cookie signing; Tailwind for styling; Vitest + Playwright for tests;
+validation; TanStack Query for client data fetching; `postgres` (postgres.js) as the sole
+Postgres driver, confined to `packages/db`; `jose` for cookie signing; Tailwind for styling; Vitest + Playwright for tests;
 `eslint-plugin-boundaries` + `dependency-cruiser` to enforce the import boundary
 
 **Storage**: Supabase Postgres (EU region), schema as committed SQL migrations in
@@ -56,15 +56,27 @@ tournament, ~800 players in the ranking source, peak of a few hundred voters in 
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Gate | How this design satisfies it | Status |
-|-----------|------|------------------------------|--------|
-| I. Spec-Driven Delivery | Spec exists and precedes code | `spec.md` written and validated before this plan; no source files created yet | PASS |
-| II. Portable Core, Thin Adapters | No host/vendor imports in core; handlers are `(input, deps) => output`; single Supabase construction site | Domain in `packages/core`; handlers in `packages/api`; Supabase client only in `packages/db`; shared hooks in `packages/ui-logic`; boundary enforced by `dependency-cruiser` rules run in CI, not by convention | PASS |
-| III. Contract-First, Versioned API | Zod schemas first, generated client, `/api/v1` prefix | `packages/contracts` is authored before handlers and generates both the OpenAPI document and `packages/client`; every route lives under `/api/v1` | PASS |
-| IV. Server-Authoritative Trust Boundary | Window, dedupe, validity, aggregation server-side; service-role key server-only; RLS deny-by-default; no ballot exposure | All writes go through route adapters using the service-role key held in server env; RLS grants the anon role nothing; the reveal gate is decided server-side per request and responses are `Cache-Control: no-store` | PASS |
-| V. Simplicity and YAGNI | Smallest viable design; new services justified | One deploy target (Vercel) plus Supabase; no queue, cache, worker, or second service; aggregation is a plain SQL view; reserved-but-empty `group_final_standings` table carries no code | PASS |
+| Principle                               | Gate                                                                                                                     | How this design satisfies it                                                                                                                                                                                         | Status |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| I. Spec-Driven Delivery                 | Spec exists and precedes code                                                                                            | `spec.md` written and validated before this plan; no source files created yet                                                                                                                                        | PASS   |
+| II. Portable Core, Thin Adapters        | No host/vendor imports in core; handlers are `(input, deps) => output`; single Supabase construction site                | Domain in `packages/core`; handlers in `packages/api`; Supabase client only in `packages/db`; shared hooks in `packages/ui-logic`; boundary enforced by `dependency-cruiser` rules run in CI, not by convention      | PASS   |
+| III. Contract-First, Versioned API      | Zod schemas first, generated client, `/api/v1` prefix                                                                    | `packages/contracts` is authored before handlers and generates both the OpenAPI document and `packages/client`; every route lives under `/api/v1`                                                                    | PASS   |
+| IV. Server-Authoritative Trust Boundary | Window, dedupe, validity, aggregation server-side; service-role key server-only; RLS deny-by-default; no ballot exposure | All writes go through route adapters using the service-role key held in server env; RLS grants the anon role nothing; the reveal gate is decided server-side per request and responses are `Cache-Control: no-store` | PASS   |
+| V. Simplicity and YAGNI                 | Smallest viable design; new services justified                                                                           | One deploy target (Vercel) plus Supabase; no queue, cache, worker, or second service; aggregation is a plain SQL view; reserved-but-empty `group_final_standings` table carries no code                              | PASS   |
+
+**Amendment 2026-08-27 (during implementation, per Principle I)**: the driver named above was
+originally `@supabase/supabase-js`. It was replaced by `postgres` (postgres.js) before any
+`packages/db` code was written, because PostgREST — the protocol `supabase-js` speaks — cannot open a
+multi-statement transaction, and two design requirements are stated as transactions: publishing a
+tournament inserts tournament + groups + pairs atomically (FR-007), and casting a ballot inserts the
+ballot plus its entries atomically so a rejected ballot leaves nothing behind (FR-010). It also makes
+`Cache-Control`-independent contract tests runnable against any scratch Postgres, which the
+constitution's contract-test gate requires. Supabase Postgres remains the system of record and the
+connection still goes through Supabase's pooler (Risk R8); the boundary is unchanged and tightened —
+`packages/db` is the only module allowed to construct a database client, now enforced for `postgres`
+as well as `@supabase/*`. See [ADR-003](../../docs/adr/ADR-003-supabase-postgres-server-only.md).
 
 **Post-design re-check (after Phase 1)**: PASS. Two items were reviewed and consciously kept:
 `packages/client` is generated rather than hand-written (Principle III requires it), and aggregation
@@ -123,18 +135,18 @@ re-hosting `packages/api` behind Fastify (one file per route, same handler calls
 
 Full records live in `docs/adr/`. Summary:
 
-| ADR | Decision | Primary trade-off accepted |
-|-----|----------|----------------------------|
-| [ADR-001](../../docs/adr/ADR-001-monorepo-portable-core.md) | Monorepo with portable core packages and thin host adapters | Monorepo tooling overhead now, in exchange for cheap web→mobile and Next→standalone moves later |
-| [ADR-002](../../docs/adr/ADR-002-nextjs-route-handlers-as-api-host.md) | Next.js route handlers host `/api/v1` in phase 1 | Mobile clients depend on the web app's deploy until the API is detached |
-| [ADR-003](../../docs/adr/ADR-003-supabase-postgres-server-only.md) | Supabase Postgres, reached only from the server; RLS denies anon | Loses Supabase's zero-backend convenience; every read needs a route |
-| [ADR-004](../../docs/adr/ADR-004-anonymous-voter-cookie.md) | Signed httpOnly cookie as voter identity | Private windows and cleared cookies vote again; no cross-device history |
-| [ADR-005](../../docs/adr/ADR-005-normalised-ballot-entries.md) | Ballots stored as one row per pair-position, not a JSON array | More rows and joins than a JSON blob, in exchange for DB-enforced validity and SQL aggregation |
-| [ADR-006](../../docs/adr/ADR-006-aggregation-sql-view-plus-pure-scoring.md) | Counting in a SQL view, percentages and ordering in a pure function | Logic spans two places; the split keeps the formula unit-testable and the counting fast |
-| [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md) | Ranking-sheet `ID` as canonical player identifier, normalised exact-name matching | Import fails loudly on any new or renamed player; no fuzzy convenience |
-| [ADR-008](../../docs/adr/ADR-008-vote-to-reveal-gating.md) | Results gated server-side until the requester votes or voting closes | No CDN caching of tournament responses; slightly higher server load |
-| [ADR-009](../../docs/adr/ADR-009-testing-strategy.md) | Vitest unit + contract tests, 100% branch on core rules, 2 Playwright flows | Coverage floor is a real constraint on core code; deliberately no floor elsewhere |
-| [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md) | Vercel (EU) + Supabase EU, no other runtime services | Vendor coupling at the host layer, contained to adapters by ADR-001 |
+| ADR                                                                         | Decision                                                                          | Primary trade-off accepted                                                                      |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [ADR-001](../../docs/adr/ADR-001-monorepo-portable-core.md)                 | Monorepo with portable core packages and thin host adapters                       | Monorepo tooling overhead now, in exchange for cheap web→mobile and Next→standalone moves later |
+| [ADR-002](../../docs/adr/ADR-002-nextjs-route-handlers-as-api-host.md)      | Next.js route handlers host `/api/v1` in phase 1                                  | Mobile clients depend on the web app's deploy until the API is detached                         |
+| [ADR-003](../../docs/adr/ADR-003-supabase-postgres-server-only.md)          | Supabase Postgres, reached only from the server; RLS denies anon                  | Loses Supabase's zero-backend convenience; every read needs a route                             |
+| [ADR-004](../../docs/adr/ADR-004-anonymous-voter-cookie.md)                 | Signed httpOnly cookie as voter identity                                          | Private windows and cleared cookies vote again; no cross-device history                         |
+| [ADR-005](../../docs/adr/ADR-005-normalised-ballot-entries.md)              | Ballots stored as one row per pair-position, not a JSON array                     | More rows and joins than a JSON blob, in exchange for DB-enforced validity and SQL aggregation  |
+| [ADR-006](../../docs/adr/ADR-006-aggregation-sql-view-plus-pure-scoring.md) | Counting in a SQL view, percentages and ordering in a pure function               | Logic spans two places; the split keeps the formula unit-testable and the counting fast         |
+| [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md)          | Ranking-sheet `ID` as canonical player identifier, normalised exact-name matching | Import fails loudly on any new or renamed player; no fuzzy convenience                          |
+| [ADR-008](../../docs/adr/ADR-008-vote-to-reveal-gating.md)                  | Results gated server-side until the requester votes or voting closes              | No CDN caching of tournament responses; slightly higher server load                             |
+| [ADR-009](../../docs/adr/ADR-009-testing-strategy.md)                       | Vitest unit + contract tests, 100% branch on core rules, 2 Playwright flows       | Coverage floor is a real constraint on core code; deliberately no floor elsewhere               |
+| [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md)                | Vercel (EU) + Supabase EU, no other runtime services                              | Vendor coupling at the host layer, contained to adapters by ADR-001                             |
 
 ## Project Structure
 
@@ -207,20 +219,20 @@ relying on discipline.
 > No Constitution Check violations. Table intentionally empty.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| — | — | — |
+| --------- | ---------- | ------------------------------------ |
+| —         | —          | —                                    |
 
 ## Risks and Mitigations
 
-| # | Risk | Impact | Mitigation |
-|---|------|--------|------------|
-| R1 | Results leak before a visitor votes (cached response, over-broad payload, or a debug field) | Breaks the core game and SC-006 | Reveal decided server-side per request; `Cache-Control: no-store` on tournament and results responses; the un-voted payload never contains counts; automated test per public read path |
-| R2 | Cookie-based dedupe is trivially bypassed (private window, second device) | Ballot stuffing skews percentages | Accepted by spec; add per-IP rate limiting on ballot submission and record ballot counts so anomalies are visible; a Turnstile challenge is the pre-planned escalation if abuse appears |
-| R3 | The public ranking sheet changes shape, gains duplicate names, or stops being publicly exported | Player import breaks; identity guessing risk | Sync stores the raw CSV snapshot and fails loudly instead of guessing; duplicate-name check runs every import; last good snapshot serves imports meanwhile; organiser sees a staleness warning |
-| R4 | Next.js coupling creeps into domain code, silently killing the detach path | The stated mobile/standalone-API plan becomes a rewrite | `dependency-cruiser` boundary rules in CI (Principle II); route adapters capped at parse/call/respond and reviewed as such |
-| R5 | Lock-boundary bugs around the start instant (timezone, client clock) | Ballots accepted after close, violating SC-007 | `timestamptz` in UTC, server clock only, single `window` module in core with explicit tests at the boundary instant; client clock never consulted |
-| R6 | Low ballot counts make percentages look authoritative when they are noise | Misleading headline numbers | Ballot count displayed wherever percentages appear (FR-019); explicit "no votes yet" state |
-| R7 | Concurrent duplicate ballot submissions from one voter | Double-counted ballots, SC-009 failure | `UNIQUE (group_id, voter_id)` plus a single-statement insert; the duplicate surfaces as a domain error, not a 500 |
-| R8 | Supabase free-tier pausing or connection limits under a voting spike | Site down at the exact moment it matters | Connection pooling via Supabase's pooler; load-test the vote path at 3× expected peak before the first real tournament; upgrade tier is the accepted fix, not architecture change |
-| R9 | Organiser paste-and-publish mistakes (wrong start time, wrong lineup) | Public tournament with bad data | Mandatory preview before publish (FR-002); start time must be in the future (FR-005); republish is a new tournament, and correcting a published one is an explicit organiser action, not an in-place silent edit |
-| R10 | Image-based lineup ingestion (the deferred phase) arrives and does not fit | Rework of the publish path | The extractor is specified to plug in ahead of the existing preview step, producing the same payload shape; nothing downstream changes |
+| #   | Risk                                                                                            | Impact                                                  | Mitigation                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | Results leak before a visitor votes (cached response, over-broad payload, or a debug field)     | Breaks the core game and SC-006                         | Reveal decided server-side per request; `Cache-Control: no-store` on tournament and results responses; the un-voted payload never contains counts; automated test per public read path                           |
+| R2  | Cookie-based dedupe is trivially bypassed (private window, second device)                       | Ballot stuffing skews percentages                       | Accepted by spec; add per-IP rate limiting on ballot submission and record ballot counts so anomalies are visible; a Turnstile challenge is the pre-planned escalation if abuse appears                          |
+| R3  | The public ranking sheet changes shape, gains duplicate names, or stops being publicly exported | Player import breaks; identity guessing risk            | Sync stores the raw CSV snapshot and fails loudly instead of guessing; duplicate-name check runs every import; last good snapshot serves imports meanwhile; organiser sees a staleness warning                   |
+| R4  | Next.js coupling creeps into domain code, silently killing the detach path                      | The stated mobile/standalone-API plan becomes a rewrite | `dependency-cruiser` boundary rules in CI (Principle II); route adapters capped at parse/call/respond and reviewed as such                                                                                       |
+| R5  | Lock-boundary bugs around the start instant (timezone, client clock)                            | Ballots accepted after close, violating SC-007          | `timestamptz` in UTC, server clock only, single `window` module in core with explicit tests at the boundary instant; client clock never consulted                                                                |
+| R6  | Low ballot counts make percentages look authoritative when they are noise                       | Misleading headline numbers                             | Ballot count displayed wherever percentages appear (FR-019); explicit "no votes yet" state                                                                                                                       |
+| R7  | Concurrent duplicate ballot submissions from one voter                                          | Double-counted ballots, SC-009 failure                  | `UNIQUE (group_id, voter_id)` plus a single-statement insert; the duplicate surfaces as a domain error, not a 500                                                                                                |
+| R8  | Supabase free-tier pausing or connection limits under a voting spike                            | Site down at the exact moment it matters                | Connection pooling via Supabase's pooler; load-test the vote path at 3× expected peak before the first real tournament; upgrade tier is the accepted fix, not architecture change                                |
+| R9  | Organiser paste-and-publish mistakes (wrong start time, wrong lineup)                           | Public tournament with bad data                         | Mandatory preview before publish (FR-002); start time must be in the future (FR-005); republish is a new tournament, and correcting a published one is an explicit organiser action, not an in-place silent edit |
+| R10 | Image-based lineup ingestion (the deferred phase) arrives and does not fit                      | Rework of the publish path                              | The extractor is specified to plug in ahead of the existing preview step, producing the same payload shape; nothing downstream changes                                                                           |

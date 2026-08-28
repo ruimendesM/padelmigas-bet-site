@@ -1,0 +1,37 @@
+# Supabase CLI configuration. The project ref is supplied by `supabase link` and is not committed;
+# only migration application is driven from here (constitution: console-only edits are FORBIDDEN).
+project_id = "padelmigas-bet"
+
+[db]
+port = 54322
+major_version = 17
+
+[db.migrations]
+schema_paths = []
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+# No auth provider is used: voters are anonymous cookie holders (ADR-004) and the organiser is
+# gated by a server-signed session, not by Supabase Auth.
+enabled = false
+
+[storage]
+# Not used in phase 1.
+enabled = false
+
+[realtime]
+# Not used in phase 1.
+enabled = false
+
+[analytics]
+enabled = false

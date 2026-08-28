@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '12'
+
+jobs:
+  static:
+    name: Static gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate typed client
+        run: pnpm generate:client
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Format check
+        run: pnpm format:check
+      - name: Import boundaries (Principle II)
+        run: pnpm boundaries
+      - name: OpenAPI matches the Zod schemas
+        run: pnpm openapi:check
+
+  unit:
+    name: Unit tests + core coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:client
+      - name: Unit tests with 100% branch coverage on core rules
+        run: pnpm test:unit:coverage
+
+  migrations:
+    name: Migrations + contract tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: padelmigas_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/padelmigas_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:client
+      - name: Rollback / irreversible note present on every migration
+        run: pnpm migrations:check
+      - name: Apply every migration against a scratch database
+        run: pnpm db:apply
+      - name: Every rollback block reverses cleanly and re-applies
+        run: pnpm migrations:verify-rollback
+      - name: Contract tests
+        run: pnpm test:contract
+
+  e2e:
+    name: End-to-end flows
+    runs-on: ubuntu-latest
+    needs: [static, unit]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: padelmigas_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/padelmigas_e2e
+      # The app under test reads DATABASE_URL; e2e points it at the same scratch database.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/padelmigas_e2e
+      VOTER_COOKIE_SECRET: ci-voter-cookie-secret-not-a-real-key-000000
+      # argon2id hash of "ci-only-password", generated for CI and valid nowhere else.
+      ADMIN_PASSWORD_HASH: ${{ secrets.CI_ADMIN_PASSWORD_HASH }}
+      ADMIN_PASSWORD: ci-only-password
+      RANKINGS_CSV_URL: http://127.0.0.1:4599/rankings.csv
+      CRON_SECRET: ci-cron-secret-not-a-real-secret-0000000000
+      RATE_LIMIT_SALT: ci-rate-limit-salt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:client
+      - run: pnpm db:apply
+      - name: Install Playwright browsers
+        run: pnpm --filter @padelmigas/web exec playwright install --with-deps chromium
+      - name: Run end-to-end flows
+        run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7

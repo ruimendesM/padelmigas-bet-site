@@ -1,0 +1,21 @@
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+packages/client/src/generated.ts
+specs/001-group-standings-voting/contracts/openapi.yaml
+
+# Authored prose, not source. Prettier reflows tables, rewrites `*emphasis*` to `_emphasis_`, and
+# turns `- [X]` into `- [x]` — all of which makes spec and ADR diffs unreadable.
+specs/
+docs/
+.specify/
+.claude/
+README.md
+LICENSE

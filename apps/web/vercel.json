@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/v1/admin/rankings/sync",
+      "schedule": "0 5 * * 1"
+    }
+  ]
+}

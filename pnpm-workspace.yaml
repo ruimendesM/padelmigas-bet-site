@@ -1,0 +1,12 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'tools/*'
+
+# Build scripts are opt-in (pnpm 10+; the key is `allowBuilds` as of pnpm 12). Only the bundler and
+# native addons that genuinely need a postinstall step are listed; nothing else runs one.
+allowBuilds:
+  esbuild: true
+  '@node-rs/argon2': true
+  sharp: true
+  unrs-resolver: true

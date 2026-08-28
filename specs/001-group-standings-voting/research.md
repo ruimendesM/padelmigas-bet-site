@@ -71,7 +71,13 @@ the importer re-checks for duplicate match keys on every sync and fails loudly (
 
 - **Decision**: Supabase Postgres in an EU region; the anon key is never used for data access; RLS
   denies the anon role on every table; all access flows through `packages/db` with the service-role
-  key held in server environment variables.
+  credential held in server environment variables.
+- **Amended 2026-08-27 (implementation)**: the access library is `postgres` (postgres.js) over
+  Supabase's connection pooler, not `@supabase/supabase-js`. PostgREST cannot open a multi-statement
+  transaction, and both the publish path (FR-007) and the ballot path (FR-010) are specified as
+  single transactions. Direct wire access also lets the contract suite run against a scratch
+  Postgres without a PostgREST instance. The boundary is unchanged: `packages/db` remains the only
+  module permitted to construct a database client.
 - **Rationale**: relational data with hard uniqueness rules (one ballot per voter per group, one
   position per ballot) belongs in a relational store with those constraints declared. Postgres also
   aggregates ballots directly, removing any need for a separate analytics path.
