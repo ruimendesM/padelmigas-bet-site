@@ -1,7 +1,8 @@
 # ADR-007: Ranking-Sheet ID as Canonical Player Identity, Normalised Exact-Name Matching
 
 ## Status
-Accepted — 2026-08-27
+Accepted — 2026-08-27. **Amended 2026-08-28**: the canonical identity moves from the sheet's `ID` to
+the normalised name. See "Amendment" below; the matching rules themselves are unchanged.
 
 ## Context
 Players must be stored individually and once, so that tournament history can be derived per player
@@ -55,6 +56,58 @@ displayed figures never change retroactively.
 - **Creating a local player on first sight of an unknown name** — smoothest import. Rejected: it
   guarantees duplicate people within a season.
 
+## Amendment — 2026-08-28: normalised name becomes the canonical identity
+
+### What changed
+`external_id` is no longer the canonical identity and no longer unique. The `match_key` — the
+normalised name this ADR already defined — becomes the identity a player is stored and resolved
+under. `external_id` is retained as nullable, non-unique, informational metadata.
+
+Nothing else in this ADR changes. The matching rule (NFC → case fold → collapse whitespace), the
+refusal to fuzzy match, the abort-on-colliding-match-key check, and the refusal to invent a player
+under a guessed identity all stand exactly as written.
+
+### Why
+The original decision rested on a premise that turned out to be false: that the sheet's `ID` was a
+stable unique identifier. Verified against the live export on 2026-08-28 — 784 rows, 756 distinct
+identifiers, 18 identifiers shared by 46 rows describing different people, and 784 distinct
+normalised names with zero collisions. The identifiers run 1..784 with exactly 28 unused slots and
+exactly 28 surplus rows, so the sheet was intended to be unique and 28 assignments collided.
+
+Two facts make this unfixable at the source rather than a data-entry problem to report upstream:
+
+1. **The sheet is maintained by a third party.** The club cannot correct the 28 rows, and cannot stop
+   the next collision when a new member is added.
+2. **While the identifier is required to be unique, every import aborts.** The system is not
+   degraded, it is stopped — no players, no ratings, no publish.
+
+Rating history lives in the row rather than being keyed by the identifier, so demoting it loses
+nothing that the source itself relies on.
+
+### Consequences of the amendment
+
+**Positive**
+- Imports work against the sheet as it actually is, not as it was assumed to be.
+- The identity key is now the only field in the source that has ever been unique.
+- Collision handling gets simpler: one guard on one key, rather than two keys that can disagree.
+
+**Negative**
+- **A rename on the sheet now splits a player in two.** Accents are deliberately preserved by the
+  normaliser, so a correction from `Joao` to `João` produces a different key: the history orphans and
+  a duplicate person appears. Previously a rename was recoverable because the identifier held the
+  person together. Nothing detects this automatically.
+- The explicit `externalId` disambiguation escape hatch is gone, because the field it relied on is
+  not unique. Two people who genuinely share a normalised name can no longer be told apart at all —
+  the import aborts and there is no payload-level override.
+- The club now depends on a third party never introducing a duplicate name. It has not happened in
+  784 rows, but the failure mode is a hard stop that the club cannot clear on its own.
+
+**Neutral**
+- The "auto-match with an admin merge UI" alternative below moves from *deferred* to *the eventual
+  answer to name drift*. It is the mitigation for both negatives above and should be specified as
+  soon as either one actually bites.
+
 ## References
-- [research.md](../../specs/001-group-standings-voting/research.md) — F1, F2
-- [spec.md](../../specs/001-group-standings-voting/spec.md) — FR-004, FR-005, FR-007, FR-008
+- [research.md](../../specs/001-group-standings-voting/research.md) — F1, F2 (F2 amended 2026-08-28)
+- [spec.md](../../specs/001-group-standings-voting/spec.md) — FR-004 (amended), FR-005, FR-007, FR-008
+- [data-model.md](../../specs/001-group-standings-voting/data-model.md) — `players` (amended)

@@ -39,6 +39,28 @@ Checked the 24 names from a real 12-pair lineup against the sheet:
 fuzzy matching is unnecessary. Because uniqueness is a property of today's data and not a guarantee,
 the importer re-checks for duplicate match keys on every sync and fails loudly (ADR-007).
 
+> **Amended 2026-08-28 — the sheet's `ID` column is not unique.** F2 originally checked names only,
+> and assumed the `ID` column was sound because the sheet presented it as an identifier. Re-checked
+> against the live export on 2026-08-28 with a real CSV parser:
+>
+> | Property                  | Value                                    |
+> | ------------------------- | ---------------------------------------- |
+> | Data rows                 | 784                                      |
+> | Distinct `ID` values      | 756 — **28 surplus rows**                |
+> | Colliding `ID` values     | 18, shared by 46 rows, all real people   |
+> | `ID` range                | 1..784, with exactly 28 unused slots     |
+> | Distinct normalised names | 784 — **0 collisions**                   |
+>
+> The 28 free slots matching the 28 surplus rows exactly says the sheet was meant to be a clean
+> 1..784 and 28 assignments landed on a number already taken. Rating history lives in the row rather
+> than being keyed by the identifier, so nothing in the source depends on the identifier being
+> unique.
+>
+> **Revised consequence**: the normalised name is the only field in the source that identifies a
+> person, so it becomes the identity key (FR-004 as amended). The duplicate-match-key check stays and
+> becomes more important, not less — it is now the sole guard on identity. The earlier F2 figure of
+> "783 rows" was one short: the export has no trailing newline, which line-counting undercounts.
+
 ## Decisions
 
 ### D1 — Repository shape: monorepo with portable core packages

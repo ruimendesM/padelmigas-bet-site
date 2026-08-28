@@ -212,6 +212,41 @@ Supabase client.
 
 ---
 
+## Phase 8: Amendment — normalised name as canonical player identity (2026-08-28)
+
+Added after Phase 7 in response to a source-data defect found while running the first real import.
+Rationale and trade-offs: [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md)
+§ Amendment; requirement wording: FR-004 as amended; schema: `data-model.md` § `players`.
+
+**Why this is not optional**: while `players.external_id` is `UNIQUE NOT NULL`, every import of the
+real ranking sheet aborts, so no tournament can be published at all. The sheet is third-party
+maintained and cannot be corrected upstream.
+
+- [ ] T102 Migration `0006_external_id_not_unique.sql` with its rollback: drop the UNIQUE constraint on `players.external_id` and make the column nullable, leaving `players.match_key` UNIQUE as the sole identity key; rollback must be executable on a database holding duplicate `external_id` values, or fail loudly rather than silently discard rows (FR-004, data-model § `players`)
+- [ ] T103 Verify the rollback actually reverses and re-applies via `pnpm migrations:verify-rollback`, which is the gate that caught the unexecutable rollback in `0003` (Principle: Quality Gates)
+- [ ] T104 [P] Contract test: an import whose source rows carry duplicate `external_id` values but distinct normalised names succeeds and creates one player per name (FR-004)
+- [ ] T105 [P] Contract test: an import whose source rows produce two identical `match_key` values still aborts with `DUPLICATE_MATCH_KEY` and leaves the database untouched — this check is now the sole guard on identity (FR-004, quickstart V6.3)
+- [ ] T106 [P] Contract test: re-running the import is idempotent — no duplicate players, no duplicate ratings, snapshots rewritten (quickstart V6.1)
+- [ ] T107 Make `externalId` nullable in the `playerDetail` and `resolvedPlayer` response schemas in `packages/contracts` (`players.ts`, `tournaments.ts`). Both currently declare it required and non-nullable, so a player row without one would fail response validation the moment the column becomes nullable (Principle III, FR-004)
+- [ ] T108 Retire the explicit `externalId` disambiguation path in **both** `packages/contracts` (the optional `externalId` on `lineupPlayer`) and `packages/core/matching`: it resolved ties by a field that is no longer unique, so it can now select the wrong person. Removing it means two genuinely identical normalised names abort with no payload-level override — the accepted cost recorded in ADR-007 § Amendment (FR-004)
+- [ ] T109 Regenerate the client and the OpenAPI document with `pnpm generate:client && pnpm generate:openapi` after T107 and T108, and confirm `pnpm openapi:check` passes. Contracts are the source of truth and both artifacts are generated from them; skipping this fails CI (Principle III)
+- [ ] T110 Remove the `external_id` uniqueness precondition from `packages/core/rankings/parse.ts` so a repeated identifier is no longer an import failure, keeping the `match_key` collision check exactly as written (FR-004)
+- [ ] T111 Change the players repository in `packages/db` to upsert on `match_key` rather than `external_id`, so a repeated identifier cannot merge two people (data-model § `players`)
+- [ ] T112 Update the unit tests for `core/matching`, `core/rankings/parse` and the fixtures that assumed a unique `external_id`, keeping branch coverage on the gated modules at 100% (Principle: Quality Gates)
+- [ ] T113 Run the real import against the live sheet and record the outcome — row count, players created, ratings, snapshots — then re-run to confirm idempotence (quickstart V6.1, closes the import half of T098)
+
+### Task count (amendment)
+
+12 tasks: schema 2, contract tests 3, contracts + codegen 3, implementation 2, tests 1, verification 1.
+
+T107-T109 were added on 2026-08-28 by `/speckit-analyze`, which found that `externalId` is declared
+required and non-nullable in two response schemas and that Principle III makes this a contracts-first
+change rather than a schema-only one. Without them the migration lands green and `openapi:check`
+fails.
+
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -289,4 +324,8 @@ first release rather than a follow-up.
 
 ### Task count
 
-101 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11.
+113 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12.
+
+The Amendment phase (T102–T113) was added on 2026-08-28, after Phase 7, when the first import against
+the real ranking sheet revealed that the source's `ID` column is not unique. It is a correctness fix
+to an already-specified requirement (FR-004), not new scope.

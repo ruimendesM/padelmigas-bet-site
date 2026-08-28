@@ -182,8 +182,19 @@ cross-tournament appearances are all correct.
   evenly, and MUST accept an explicit group assignment in the payload that overrides the derived one.
 - **FR-004**: The system MUST resolve every player in a payload to a single stored player identity,
   matching on the player's name compared after Unicode normalisation, case folding, and whitespace
-  collapsing, and MUST use the ranking list's own identifier as that player's canonical external
-  identifier.
+  collapsing. That normalised name is the canonical identity. The ranking list's own identifier MUST
+  be retained alongside it as informational metadata, and MUST NOT be treated as unique or used to
+  decide whether two rows describe the same person.
+
+  > **Amended 2026-08-28.** This requirement previously made the ranking list's identifier the
+  > canonical identity. Verified against the live list on that date: 784 rows, but only 756 distinct
+  > identifiers — 18 identifiers are shared by 46 rows describing different people. Identifiers run
+  > 1..784 with exactly 28 free slots and exactly 28 surplus rows, so the list was intended to be
+  > unique and 28 assignments landed on a taken number. The list is maintained by a third party, so
+  > the club cannot correct it, and every import aborts while the identifier is required to be
+  > unique. The same check found 784 distinct normalised names — zero collisions — so the normalised
+  > name is the only field in the source that actually identifies a person. See
+  > [ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md).
 - **FR-005**: The system MUST reject an entire payload, publishing nothing, when any player cannot be
   resolved, when a required field is missing or malformed, when the start instant is not in the
   future, when a position or pair is duplicated, or when a player appears more than once, and MUST
@@ -249,8 +260,10 @@ cross-tournament appearances are all correct.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Player**: one real person. Canonical external identifier taken from the published ranking list,
-  display name, normalised match key, current club. Exists independently of any tournament.
+- **Player**: one real person. The normalised match key derived from the name is the canonical
+  identity (FR-004, amended 2026-08-28); the ranking list's own identifier is kept alongside it as
+  informational metadata and is not unique. Also display name and current club. Exists independently
+  of any tournament.
 - **Ranking snapshot**: a player's ranking points as published on a given date, used to populate and
   refresh player data and to capture points at publish time.
 - **Tournament**: a named event with a start instant that also serves as the voting deadline, a
@@ -276,7 +289,7 @@ cross-tournament appearances are all correct.
   publicly votable tournament in under 2 minutes, with no manual re-typing of player names.
 - **SC-002**: A first-time visitor can complete a ballot for one group of six in under 60 seconds
   without instructions, on a phone.
-- **SC-003**: 100% of published tournaments have every player resolved to a ranking-list identity;
+- **SC-003**: 100% of published tournaments have every player resolved to a ranking-list entry;
   the system never creates a silently guessed player record.
 - **SC-004**: Percentages and predicted order shown for a group match, exactly, the values computed
   by hand from that group's recorded ballots, for every group in an audit of a full tournament.
@@ -302,8 +315,12 @@ cross-tournament appearances are all correct.
 - Phase 1 ingests the lineup as structured data pasted by the organiser. Extracting the lineup from a
   photograph or spreadsheet screenshot is explicitly deferred; the preview-and-publish step is
   designed to be the place where an automated extractor plugs in later.
-- The published club ranking list is the authority for player identity and provides a stable numeric
-  identifier and a name per player. It is publicly readable without credentials.
+- The published club ranking list is the authority for player identity and provides a name per
+  player. It is publicly readable without credentials. It also carries a numeric identifier, but that
+  identifier is **not** unique and is therefore informational only (amended 2026-08-28, FR-004).
+- The ranking list is maintained by a third party. The club can neither correct its contents nor
+  prevent a future collision, so the system must fail loudly on ambiguity rather than assume the
+  source can be fixed.
 - Player names in a lineup payload match the ranking list exactly apart from case, accent
   composition, and whitespace. No fuzzy or nickname matching is attempted in phase 1.
 - Groups normally contain exactly six pairs; a lineup that does not divide evenly produces one

@@ -65,7 +65,7 @@ All six must pass before a merge. A failing gate is fixed or reverted, never ski
 2. Paste `contracts/lineup-payload.example.json` and choose Preview.
 3. **Expect**: 2 groups of 6, ordered by pair total points descending — group A led by
    Bastos / Trindade (1193), group B led by Chaves / da Costa (885); all 24 players resolved to
-   ranking-list IDs; no player flagged unknown.
+   ranking-list entries; no player flagged unknown.
 4. Publish. **Expect**: the tournament appears at `/` with voting open.
 5. Now edit the payload to misspell one name (e.g. `Rodrigo da Costaa`) and preview again.
    **Expect**: publishing blocked, the offending entry named with its path, nothing persisted.

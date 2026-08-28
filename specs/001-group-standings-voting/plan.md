@@ -78,6 +78,24 @@ connection still goes through Supabase's pooler (Risk R8); the boundary is uncha
 `packages/db` is the only module allowed to construct a database client, now enforced for `postgres`
 as well as `@supabase/*`. See [ADR-003](../../docs/adr/ADR-003-supabase-postgres-server-only.md).
 
+**Amendment 2026-08-28 (during implementation, per Principle I)**: the canonical player identity
+moves from the ranking sheet's `ID` to the normalised name (`match_key`). The sheet's `ID` column is
+not unique — 784 rows, 756 distinct values, 18 values shared by 46 rows describing different people —
+and the sheet is maintained by a third party, so the club can neither correct it nor prevent the next
+collision. While `external_id` is required to be unique, every import aborts and nothing can be
+published at all. All 784 normalised names are distinct, so `match_key` is the only field in the
+source that has ever identified a person.
+
+No principle is weakened by this. Principle II is untouched: `packages/core/matching` already owns
+normalisation and keeps owning it, and the change is confined to which key the importer upserts on.
+Principle IV is untouched: identity is still decided server-side and the duplicate-key check still
+aborts the whole import. The change is delivered as migration `0006` plus a repository change, with
+the guard on `match_key` becoming load-bearing rather than merely defensive. The accepted cost is
+that a rename on the sheet now splits a player in two, and that the explicit `externalId`
+disambiguation escape hatch is gone; both are recorded in
+[ADR-007](../../docs/adr/ADR-007-player-identity-ranking-sheet.md) § Amendment, whose "admin merge UI"
+alternative is the eventual mitigation.
+
 **Post-design re-check (after Phase 1)**: PASS. Two items were reviewed and consciously kept:
 `packages/client` is generated rather than hand-written (Principle III requires it), and aggregation
 is split between a SQL view (counting) and a pure TypeScript function (percentages, ordering,
