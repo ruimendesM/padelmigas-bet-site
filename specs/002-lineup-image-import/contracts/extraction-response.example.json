@@ -1,0 +1,126 @@
+{
+  "_note": "Illustrative fixture, matching the fictional lineup in specs/001-group-standings-voting/contracts/lineup-payload.example.json. Real player data is never committed. Two rows are deliberately imperfect so the flag rendering and the correction flow have something to exercise: sourceIndex 4 lost one player's points to a compression artefact, and sourceIndex 8's total (829) disagrees with the sum of its two players (819).",
+  "rows": [
+    {
+      "sourceIndex": 0,
+      "players": [
+        { "name": "Afonso Bastos", "points": 533 },
+        { "name": "Vasco Trindade", "points": 660 }
+      ],
+      "totalPoints": 1193,
+      "club": "Clube Padel Norte",
+      "flags": []
+    },
+    {
+      "sourceIndex": 1,
+      "players": [
+        { "name": "Bernardo Quintela", "points": 507 },
+        { "name": "Salvador Neves", "points": 507 }
+      ],
+      "totalPoints": 1014,
+      "club": "Clube Padel Norte",
+      "flags": []
+    },
+    {
+      "sourceIndex": 2,
+      "players": [
+        { "name": "Duarte Vilaça", "points": 495 },
+        { "name": "Xavier Lourenço", "points": 449 }
+      ],
+      "totalPoints": 944,
+      "club": "Clube Padel Norte",
+      "flags": []
+    },
+    {
+      "sourceIndex": 3,
+      "players": [
+        { "name": "Gabriel Rebelo", "points": 481 },
+        { "name": "Simão Anjos", "points": 436 }
+      ],
+      "totalPoints": 917,
+      "club": "Clube Padel Norte",
+      "flags": []
+    },
+    {
+      "sourceIndex": 4,
+      "players": [
+        { "name": "Hugo Vasconcelos", "points": 435 },
+        { "name": "Ivo Peixoto", "points": null }
+      ],
+      "totalPoints": 896,
+      "club": "Clube Padel Norte",
+      "flags": ["MISSING_POINTS"]
+    },
+    {
+      "sourceIndex": 5,
+      "players": [
+        { "name": "Leonardo Sampaio", "points": 443 },
+        { "name": "Mateus Portela", "points": 444 }
+      ],
+      "totalPoints": 887,
+      "club": "Clube Padel Norte",
+      "flags": []
+    },
+    {
+      "sourceIndex": 6,
+      "players": [
+        { "name": "Otávio Chaves", "points": 442 },
+        { "name": "Rodrigo da Costa", "points": 443 }
+      ],
+      "totalPoints": 885,
+      "club": "Clube Padel Sul",
+      "flags": []
+    },
+    {
+      "sourceIndex": 7,
+      "players": [
+        { "name": "Teodoro Marques", "points": 456 },
+        { "name": "Ulisses Braga", "points": 397 }
+      ],
+      "totalPoints": 853,
+      "club": "Clube Padel Sul",
+      "flags": []
+    },
+    {
+      "sourceIndex": 8,
+      "players": [
+        { "name": "Vicente Seixas", "points": 398 },
+        { "name": "Martim Amaral", "points": 421 }
+      ],
+      "totalPoints": 829,
+      "club": "Clube Padel Sul",
+      "flags": ["TOTAL_MISMATCH"]
+    },
+    {
+      "sourceIndex": 9,
+      "players": [
+        { "name": "Bento Loureiro", "points": 423 },
+        { "name": "Caetano Vidal", "points": 378 }
+      ],
+      "totalPoints": 801,
+      "club": "Clube Padel Sul",
+      "flags": []
+    },
+    {
+      "sourceIndex": 10,
+      "players": [
+        { "name": "Emídio Tavares", "points": 381 },
+        { "name": "Fábio Cordeiro", "points": 392 }
+      ],
+      "totalPoints": 773,
+      "club": "Clube Padel Sul",
+      "flags": []
+    },
+    {
+      "sourceIndex": 11,
+      "players": [
+        { "name": "Guilherme Antunes", "points": 375 },
+        { "name": "Heitor Pinheiro", "points": 375 }
+      ],
+      "totalPoints": 750,
+      "club": "Clube Padel Sul",
+      "flags": []
+    }
+  ],
+  "warnings": []
+}
