@@ -11,7 +11,7 @@ One new optional variable, plus one optional override:
 ```bash
 # apps/web/.env.local
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.0-flash   # optional; the adapter has a default
+GEMINI_MODEL=gemini-3.6-flash   # optional; the adapter has a default
 ```
 
 `GEMINI_API_KEY` is **optional by design** (FR-120, research D5). With it absent the app runs
@@ -122,6 +122,20 @@ pnpm boundaries && pnpm openapi:check && pnpm typecheck && pnpm lint
 endpoint was registered in `ENDPOINTS` rather than only implemented.
 
 **No automated test calls the real extraction provider** (research D10). CI needs no API key.
+
+## When extraction fails
+
+`EXTRACTION_FAILED` is deliberately content-free on the wire, so the reason is in the server log as a
+one-line, image-free code:
+
+| Log line | Meaning | Fix |
+|---|---|---|
+| `upstream-status-404` | The configured model id no longer exists — Google retires them | Set `GEMINI_MODEL` to a current id, or update the adapter's default |
+| `upstream-status-401` / `403` | Key rejected or restricted | Check the key, and any API restrictions on it |
+| `upstream-status-429` | Free-tier rate limit | Wait, then retry |
+| `timeout` | No answer within 15 s | Retry; try a smaller image |
+| `response-schema-mismatch` | The model answered, but not in the required shape | Check the prompt and schema in `contracts/extraction-prompt.md` |
+| `unusable-response` | The response carried no text part at all — a safety block or a truncated generation | Try another image |
 
 ## What is checked by hand, not in CI
 

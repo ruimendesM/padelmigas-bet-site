@@ -24,12 +24,26 @@ import type { LineupImageInput, LineupImageReader, RawExtractedRow } from '@pade
  * `specs/002-lineup-image-import/contracts/extraction-prompt.md`. Keep the two in step.
  */
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 /** One attempt, then fail. SC-102 allows ten seconds to a draft or a clear failure; a retry would
  * double the worst case, and with one organiser doing this monthly the right retry is manual
  * (research D6). */
 const TIMEOUT_MS = 15_000;
+
+/**
+ * A failure with a reason that is safe to log.
+ *
+ * The provider's own message is deliberately not carried: it can quote the request, and nothing
+ * derived from the image may reach a log (FR-118). The reason is a fixed code, so an operator can
+ * tell a retired model from a timeout without the bytes appearing anywhere.
+ */
+export class ExtractionFailure extends Error {
+  constructor(readonly reason: string) {
+    super(`Lineup extraction failed: ${reason}`);
+    this.name = 'ExtractionFailure';
+  }
+}
 
 const INSTRUCTION = `You are reading a screenshot of a padel tournament lineup table. Each row of the table is one pair of players.
 
@@ -150,13 +164,20 @@ export function createGeminiLineupImageReader(
         );
 
         if (!response.ok) {
-          // The status alone, never the body: a provider error can echo the request back.
-          throw new Error(`Extraction provider answered ${response.status}.`);
+          // The status alone, never the body: a provider error can echo the request back. A 404 here
+          // almost always means the configured model has been retired.
+          throw new ExtractionFailure(`upstream-status-${response.status}`);
         }
 
         const payload: unknown = await response.json();
         const text = firstTextPart(payload);
-        const parsed = responseRows.parse(JSON.parse(text) as unknown);
+
+        let parsed;
+        try {
+          parsed = responseRows.parse(JSON.parse(text) as unknown);
+        } catch {
+          throw new ExtractionFailure('response-schema-mismatch');
+        }
 
         return parsed.rows.map((row): RawExtractedRow => ({
           player1Name: row.player1Name,
@@ -166,6 +187,17 @@ export function createGeminiLineupImageReader(
           totalPoints: row.totalPoints,
           club: row.club,
         }));
+      } catch (failure) {
+        // One line, content-free, so a misconfiguration is diagnosable from the server log without
+        // the image or the provider's echo of it ever being written down.
+        const reason =
+          failure instanceof ExtractionFailure
+            ? failure.reason
+            : failure instanceof Error && failure.name === 'AbortError'
+              ? 'timeout'
+              : 'transport-error';
+        console.warn(`Lineup extraction failed (${reason}).`);
+        throw failure;
       } finally {
         clearTimeout(timeout);
       }
@@ -182,17 +214,28 @@ export function createGeminiLineupImageReader(
 const envelope = z.object({
   candidates: z
     .array(
-      z.object({ content: z.object({ parts: z.array(z.object({ text: z.string() })).min(1) }) }),
+      z.object({
+        // A part need not carry text: current models interleave reasoning parts that carry only a
+        // signature. Requiring `text` on every part rejected perfectly good responses, so the answer
+        // is the first part that actually has text.
+        content: z.object({ parts: z.array(z.object({ text: z.string().optional() })).min(1) }),
+      }),
     )
     .min(1),
 });
 
 function firstTextPart(payload: unknown): string {
   const parsed = envelope.safeParse(payload);
-  if (!parsed.success) {
-    throw new Error('Extraction provider returned no usable content.');
+  const text = parsed.success
+    ? parsed.data.candidates
+        .flatMap((candidate) => candidate.content.parts)
+        .find((part) => part.text !== undefined && part.text.length > 0)?.text
+    : undefined;
+
+  if (text === undefined) {
+    throw new ExtractionFailure('unusable-response');
   }
-  return parsed.data.candidates[0]!.content.parts[0]!.text;
+  return text;
 }
 
 /** Bytes → base64 without `Buffer`, so this file stays runtime-agnostic like the rest of the host. */
