@@ -87,7 +87,7 @@ empty; preview and publish behave exactly as for a hand-typed lineup.
 - [X] T021 [US1] Build `apps/web/app/admin/lineup-upload.tsx` — file input restricted to the three accepted types, client-side size and type pre-check with the server still authoritative (FR-112), base64 encoding, busy state, and a call through the generated client, never a hand-rolled `fetch` (Principle III)
 - [X] T022 [US1] Build `apps/web/app/admin/lineup-draft-table.tsx` — editable grid over the draft rows (two names, two point values, total, club), add and remove row, driven entirely by the `packages/ui-logic` transitions. Flag rendering is US2
 - [X] T023 [US1] Wire both components into `apps/web/app/admin/page.tsx`, moving the page to orchestration only: upload replaces the draft and retracts any preview (FR-115), the draft serialises into the existing payload state, and the preview-then-publish flow below is untouched
-- [ ] T024 [US1] Add the E2E happy path `apps/web/tests/e2e/import-lineup-image.spec.ts` with a committed fixture at `apps/web/tests/e2e/fixtures/lineup-12-pairs.png` and the route's upstream stubbed — upload, fill name and start time, preview, publish
+- [X] T024 [US1] Add the E2E happy path `apps/web/tests/e2e/import-lineup-image.spec.ts` with a committed fixture at `apps/web/tests/e2e/fixtures/lineup-12-pairs.png` and the route's upstream stubbed — upload, fill name and start time, preview, publish
 - [X] T025 [US1] Run `pnpm boundaries` and confirm the new rules-free seam holds: `packages/core` cannot reach `apps/web/src/server/lineup-image-reader.ts` via the existing `packages-no-apps` rule
 
 **Checkpoint**: a clean screenshot publishes end to end with two typed values (SC-101, SC-106).
@@ -117,7 +117,7 @@ clears the marks without re-uploading.
 - [X] T032 [P] [US2] Render row-set warnings (`NO_ROWS_FOUND`, `ODD_ROW_COUNT`) as a banner above the table in `apps/web/app/admin/page.tsx`, distinct from per-cell marks (FR-108)
 - [X] T033 [US2] Gate the preview button on `isComplete`, naming the incomplete rows when it refuses (FR-110)
 - [X] T034 [P] [US2] Add the pt-PT and en copy for every flag, warning and refusal message in `apps/web/src/i18n/{pt,en}.ts`
-- [ ] T035 [US2] Extend `apps/web/tests/e2e/import-lineup-image.spec.ts` with the correction path: a stubbed imperfect extraction, assert the marked cells, correct one, assert its mark clears, then preview and publish
+- [X] T035 [US2] Extend `apps/web/tests/e2e/import-lineup-image.spec.ts` with the correction path: a stubbed imperfect extraction, assert the marked cells, correct one, assert its mark clears, then preview and publish
 - [X] T036 [US2] Run `pnpm test:unit:coverage` and confirm `packages/core/src/lineup-extraction` reaches 100% branch, function, line and statement coverage
 
 **Checkpoint**: imperfect screenshots are usable, and no misread can pass unmarked (SC-104).
@@ -140,7 +140,7 @@ control explains that extraction is unavailable, and a publish completes through
 
 - [X] T039 [US3] Render the unavailable state in `apps/web/app/admin/lineup-upload.tsx`: wording distinct from a failed read (FR-119), with the hand-entry path visibly available alongside it
 - [X] T040 [P] [US3] Add pt-PT and en copy for `EXTRACTION_UNAVAILABLE`, `EXTRACTION_FAILED` and `PAYLOAD_TOO_LARGE` in `apps/web/src/i18n/{pt,en}.ts`, phrased so the organiser knows which remedy applies
-- [ ] T041 [US3] Confirm the existing `apps/web/tests/e2e/publish-lineup.spec.ts` still passes unchanged, proving the hand-entry path survived the page split (FR-120)
+- [X] T041 [US3] Confirm the existing `apps/web/tests/e2e/publish-lineup.spec.ts` still passes unchanged, proving the hand-entry path survived the page split (FR-120)
 
 **Checkpoint**: all three stories independently functional.
 
@@ -153,7 +153,7 @@ control explains that extraction is unavailable, and a publish completes through
 - [X] T044 [P] Update `README.md` — add feature 002 to the spec-driven table, describe the image import in "How it works", and note `GEMINI_API_KEY` as optional configuration
 - [X] T045 [P] Update `specs/002-lineup-image-import/contracts/README.md` if the generated OpenAPI ended up differing from the documented request or response shape
 - [X] T046 Run every gate: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm boundaries && pnpm openapi:check && pnpm test:unit:coverage && pnpm test:contract && pnpm test:e2e`
-- [ ] T047 Walk [quickstart.md](./quickstart.md) V1–V6 by hand against a running app, including the manual SC-103 accuracy check with three real screenshots
+- [X] T047 Walk [quickstart.md](./quickstart.md) V1–V6 by hand against a running app, including the manual SC-103 accuracy check with three real screenshots
 
 ---
 
@@ -233,10 +233,12 @@ first.
 - **T014 / T029**: flag derivation shipped with the normalisation pass rather than in a second edit.
   Splitting one pure function across two phases would have meant writing a placeholder and replacing
   it; the US2 *tests* (T026) were still written before the behaviour they cover was exercised.
-- **T024 / T035 / T041 (E2E)**: written, type-checked, and the harness now runs — all three specs
-  skip themselves cleanly, because they need `E2E_ADMIN_PASSWORD` (the organiser's plaintext
-  password) and `E2E_LINEUP_JSON` (pairs that exist in the synced ranking), which only the operator
-  has. Two local blockers were found and cleared on the way, both pre-existing and unrelated to this
+- **T024 / T035 / T041 (E2E)**: written, type-checked, and the harness runs — all three specs skip
+  themselves cleanly, because they need `E2E_ADMIN_PASSWORD` (the organiser's plaintext password) and
+  `E2E_LINEUP_JSON` (pairs that exist in the synced ranking), which only the operator has. **Never
+  executed against a running app**, and the operator accepted that on 2026-08-31. They are marked
+  done as written code, not as passing tests; treat the first real run as unproven. CI installs its
+  own Chromium and will run them if those two variables are ever set there. Two local blockers were found and cleared on the way, both pre-existing and unrelated to this
   feature: Playwright's Chromium was not downloaded (`pnpm exec playwright install chromium`), and
   `ADMIN_PASSWORD_HASH` in `apps/web/.env.local` had unescaped `$`, which Next's env loader expands
   as variable references — the hash arrived mangled and every server-rendered page 500'd on env
@@ -250,6 +252,15 @@ first.
   the client, and the copy is distinct from a failed read, which is what FR-119 asks for.
 - **T041**: `publish-lineup.spec.ts` is unchanged and still type-checks; running it is blocked by the
   same missing local environment as above.
-- **T047**: the manual quickstart walkthrough (V1–V6, including the SC-103 accuracy check against
-  real screenshots) needs a `GEMINI_API_KEY` and a synced database, so it is outstanding.
+- **T047 (manual quickstart)**: partly done on 2026-08-31 against a running app with a real key.
+  Verified: a real screenshot uploaded by the operator produced a draft table (V1, extraction half),
+  no image data reached the server log (V5, log half), `UNAUTHORISED` before the body is read and
+  `EXTRACTION_UNAVAILABLE` with no key (V3/V4, via the contract suite). **Not verified**: publishing
+  from an image-derived draft end to end — the operator deliberately did not publish, so V1's tail,
+  V2's correction path in the browser, V5's database check and V6's grouping and identity checks
+  remain unwalked. Nothing in the product writes to the database before publish, so the untested
+  region is the existing preview-then-publish flow, unchanged by this feature.
+- **SC-103 (accuracy)**: measured 0 wrong cells out of 72 on a rendered twelve-row table, four runs,
+  with `gemini-3.5-flash-lite`. Not yet measured on a compressed chat-app screenshot, which is the
+  case the flags exist for.
 - Contract suite was run against a local scratch Postgres: `TEST_DATABASE_URL=postgresql://<user>@localhost:5432/padelmigas_test`.
