@@ -113,6 +113,40 @@ export const pt = {
     syncReport: (created: number, updated: number) =>
       `${created} jogadores criados, ${updated} atualizados.`,
     syncStale: 'A folha de ranking está inacessível; foi usada a última cópia guardada.',
+
+    // Lineup image import (feature 002)
+    uploadHeading: 'Importar de uma imagem',
+    uploadHint:
+      'Escolhe uma captura de ecrã da tabela do alinhamento (PNG, JPEG ou WebP, até 5 MB). Os nomes e pontos são lidos da imagem; só o nome do torneio e a data ficam por preencher.',
+    uploadChoose: 'Escolher imagem',
+    uploadReading: 'A ler a imagem…',
+    uploadUnavailable:
+      'A leitura de imagens não está configurada nesta instalação. Introduz o alinhamento à mão abaixo.',
+    uploadTooLargeLocal: (megabytes: number) => `A imagem tem mais de ${megabytes} MB.`,
+    uploadWrongType: 'Formato não suportado. Usa PNG, JPEG ou WebP.',
+    draftHeading: 'Alinhamento lido da imagem',
+    draftName: 'Nome do torneio',
+    draftStartsAt: 'Início (hora de Lisboa)',
+    draftRequired: 'obrigatório',
+    draftPlayer1: 'Jogador 1',
+    draftPlayer2: 'Jogador 2',
+    draftPoints1: 'PTS J1',
+    draftPoints2: 'PTS J2',
+    draftTotal: 'Pontos Total',
+    draftClub: 'Clube',
+    draftAddRow: 'Adicionar dupla',
+    draftRemoveRow: 'Remover dupla',
+    draftIncomplete: (rows: number) =>
+      `Faltam valores em ${rows} ${rows === 1 ? 'dupla' : 'duplas'}. Preenche-os antes de pré-visualizar.`,
+    draftDiscardWarning: 'O alinhamento lido ainda não foi publicado. Sair descarta-o.',
+    flagMISSING_NAME: 'Nome não lido na imagem.',
+    flagMISSING_POINTS: 'Pontos não lidos na imagem.',
+    flagMISSING_CLUB: 'Clube não lido na imagem.',
+    flagTOTAL_MISMATCH:
+      'O total não corresponde à soma dos dois jogadores. Confirma qual está certo.',
+    warningNO_ROWS_FOUND: 'Não foi encontrada nenhuma tabela de alinhamento na imagem.',
+    warningODD_ROW_COUNT:
+      'Foi lido um número ímpar de duplas. Confirma se falta ou sobra alguma linha.',
   },
 
   errors: {
@@ -136,6 +170,11 @@ export const pt = {
     ALREADY_VOTED: 'Já votaste neste grupo.',
     VOTING_CLOSED: 'A votação já encerrou.',
     RESULTS_HIDDEN: 'Vota para ver os resultados.',
+    PAYLOAD_TOO_LARGE: 'A imagem é demasiado grande. O limite é 5 MB.',
+    EXTRACTION_UNAVAILABLE:
+      'A leitura de imagens não está configurada. Introduz o alinhamento à mão.',
+    EXTRACTION_FAILED:
+      'Não foi possível ler a imagem. Tenta outra imagem ou introduz o alinhamento à mão.',
     NETWORK_ERROR: 'Não foi possível contactar o servidor.',
   },
 };

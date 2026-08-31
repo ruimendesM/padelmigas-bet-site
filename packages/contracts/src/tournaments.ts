@@ -142,6 +142,83 @@ export const lineupPreview = z.object({
 export type LineupPreviewDto = z.infer<typeof lineupPreview>;
 
 // ---------------------------------------------------------------------------------------------
+// Inbound: a lineup screenshot to extract from (FR-101, FR-117)
+// ---------------------------------------------------------------------------------------------
+
+/** Accepted upload types. Anything else is refused before extraction is attempted (FR-117). */
+export const LINEUP_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+
+/**
+ * Decoded upload ceiling, 5 MB.
+ *
+ * Checked against the base64 length *before* decoding, so an oversized body is rejected without
+ * allocating it, and again after. A screenshot of a lineup table is comfortably under this.
+ */
+export const MAX_LINEUP_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export const lineupImage = z.object({
+  mimeType: z.enum(LINEUP_IMAGE_MIME_TYPES),
+  /** Base64, with no `data:` prefix. Never stored, never logged, never echoed back (FR-118). */
+  dataBase64: z.string().min(1),
+});
+export type LineupImage = z.infer<typeof lineupImage>;
+
+export const extractLineupBody = z.object({ image: lineupImage });
+export type ExtractLineupBody = z.infer<typeof extractLineupBody>;
+
+// ---------------------------------------------------------------------------------------------
+// Outbound: the extraction result (FR-102, FR-105 – FR-108)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Per-value reasons a extracted value is suspect.
+ *
+ * Advisory to the organiser, never a publication decision: publishing is still gated by the
+ * mandatory preview, which re-validates the submitted draft (FR-111, FR-112). `TOTAL_MISMATCH` in
+ * particular does not block — the sheet's own total is what the club seeds by, and recomputing it
+ * would silently change the order (research D3).
+ */
+export const EXTRACTION_FLAGS = [
+  'MISSING_NAME',
+  'MISSING_POINTS',
+  'MISSING_CLUB',
+  'TOTAL_MISMATCH',
+] as const;
+export const extractionFlag = z.enum(EXTRACTION_FLAGS);
+export type ExtractionFlag = z.infer<typeof extractionFlag>;
+
+/** Row-set level problems, reported separately from per-value flags (FR-108). */
+export const EXTRACTION_WARNINGS = ['NO_ROWS_FOUND', 'ODD_ROW_COUNT'] as const;
+export const extractionWarning = z.enum(EXTRACTION_WARNINGS);
+export type ExtractionWarning = z.infer<typeof extractionWarning>;
+
+/** A value the reader could not read is `null`, never a guess (FR-107, ADR-011). */
+export const extractedPlayer = z.object({
+  name: z.string().nullable(),
+  points: z.number().int().min(0).nullable(),
+});
+export type ExtractedPlayerDto = z.infer<typeof extractedPlayer>;
+
+export const extractedRow = z.object({
+  /** Position in the image, top to bottom, so an issue can point back at what was uploaded. */
+  sourceIndex: z.number().int().min(0),
+  players: z.tuple([extractedPlayer, extractedPlayer]),
+  /** As read from the total column — never computed from the two player values (FR-107). */
+  totalPoints: z.number().int().min(0).nullable(),
+  /** Informational only; it never determines groups (FR-113). */
+  club: z.string().nullable(),
+  flags: z.array(extractionFlag),
+});
+export type ExtractedRowDto = z.infer<typeof extractedRow>;
+
+export const lineupExtraction = z.object({
+  /** Ordered by `totalPoints` descending; rows without a total come last. */
+  rows: z.array(extractedRow),
+  warnings: z.array(extractionWarning),
+});
+export type LineupExtractionDto = z.infer<typeof lineupExtraction>;
+
+// ---------------------------------------------------------------------------------------------
 // Outbound: the rankings sync report
 // ---------------------------------------------------------------------------------------------
 

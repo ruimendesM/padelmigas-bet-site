@@ -942,6 +942,153 @@ paths:
               additionalProperties: false
       security:
         - organiserSession: []
+  /admin/tournaments/extract:
+    post:
+      operationId: extractLineup
+      tags:
+        - admin
+      summary: Read a lineup screenshot and return candidate rows with suspect values flagged
+      description: "Requirements: FR-101, FR-102, FR-105, FR-106, FR-107, FR-108, FR-116, FR-117, FR-118,
+        FR-119."
+      responses:
+        "200":
+          description: Read a lineup screenshot and return candidate rows with suspect values flagged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sourceIndex:
+                          type: integer
+                          minimum: 0
+                        players:
+                          type: array
+                          minItems: 2
+                          maxItems: 2
+                          items:
+                            - type: object
+                              properties:
+                                name:
+                                  type: string
+                                  nullable: true
+                                points:
+                                  type: integer
+                                  minimum: 0
+                                  nullable: true
+                              required:
+                                - name
+                                - points
+                              additionalProperties: false
+                            - type: object
+                              properties:
+                                name:
+                                  type: string
+                                  nullable: true
+                                points:
+                                  type: integer
+                                  minimum: 0
+                                  nullable: true
+                              required:
+                                - name
+                                - points
+                              additionalProperties: false
+                        totalPoints:
+                          type: integer
+                          minimum: 0
+                          nullable: true
+                        club:
+                          type: string
+                          nullable: true
+                        flags:
+                          type: array
+                          items:
+                            type: string
+                            enum:
+                              - MISSING_NAME
+                              - MISSING_POINTS
+                              - MISSING_CLUB
+                              - TOTAL_MISMATCH
+                      required:
+                        - sourceIndex
+                        - players
+                        - totalPoints
+                        - club
+                        - flags
+                      additionalProperties: false
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - NO_ROWS_FOUND
+                        - ODD_ROW_COUNT
+                required:
+                  - rows
+                  - warnings
+                additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "413":
+          description: "`PAYLOAD_TOO_LARGE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "502":
+          description: "`EXTRACTION_FAILED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "503":
+          description: "`EXTRACTION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: object
+                  properties:
+                    mimeType:
+                      type: string
+                      enum:
+                        - image/png
+                        - image/jpeg
+                        - image/webp
+                    dataBase64:
+                      type: string
+                      minLength: 1
+                  required:
+                    - mimeType
+                    - dataBase64
+                  additionalProperties: false
+              required:
+                - image
+              additionalProperties: false
+      security:
+        - organiserSession: []
   /admin/tournaments:
     post:
       operationId: publishTournament
@@ -1341,6 +1488,9 @@ components:
             - SLUG_TAKEN
             - NOT_CONFIRMED
             - DUPLICATE_MATCH_KEY
+            - PAYLOAD_TOO_LARGE
+            - EXTRACTION_UNAVAILABLE
+            - EXTRACTION_FAILED
             - INCOMPLETE_BALLOT
             - DUPLICATE_POSITION
             - UNKNOWN_PAIR
@@ -1373,6 +1523,9 @@ components:
             - SLUG_TAKEN
             - NOT_CONFIRMED
             - DUPLICATE_MATCH_KEY
+            - PAYLOAD_TOO_LARGE
+            - EXTRACTION_UNAVAILABLE
+            - EXTRACTION_FAILED
             - INCOMPLETE_BALLOT
             - DUPLICATE_POSITION
             - UNKNOWN_PAIR

@@ -16,6 +16,9 @@ export default defineConfig({
         'packages/core/src/ballot/**/*.ts',
         'packages/core/src/window/**/*.ts',
         'packages/core/src/matching/**/*.ts',
+        // Added for feature 002: a misread the flags fail to mark reaches a public page looking
+        // correct, which is the same class of user-visible defect as the four modules above.
+        'packages/core/src/lineup-extraction/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/index.ts.map'],
       thresholds: {

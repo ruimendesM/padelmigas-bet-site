@@ -4,6 +4,8 @@ import { ballotSubmission, castBallotResponse, tournamentDetail } from './ballot
 import { playerDetail } from './players.js';
 import { groupResults } from './results.js';
 import {
+  extractLineupBody,
+  lineupExtraction,
   lineupPayload,
   lineupPreview,
   publishRequest,
@@ -170,6 +172,40 @@ export const ENDPOINTS = [
     ],
     voterDependent: false,
     requirements: ['FR-001', 'FR-002', 'FR-003', 'FR-004', 'FR-005'],
+  },
+  {
+    operationId: 'extractLineup',
+    method: 'POST',
+    path: '/admin/tournaments/extract',
+    summary: 'Read a lineup screenshot and return candidate rows with suspect values flagged',
+    auth: 'organiser',
+    tag: 'admin',
+    pathParams: [],
+    body: extractLineupBody,
+    response: lineupExtraction,
+    successStatus: 200,
+    errors: [
+      'MALFORMED_PAYLOAD',
+      'PAYLOAD_TOO_LARGE',
+      'EXTRACTION_UNAVAILABLE',
+      'EXTRACTION_FAILED',
+      'UNAUTHORISED',
+    ],
+    // Nothing here depends on the caller beyond being the organiser, and nothing is cacheable
+    // anyway: the request body is a different image every time.
+    voterDependent: false,
+    requirements: [
+      'FR-101',
+      'FR-102',
+      'FR-105',
+      'FR-106',
+      'FR-107',
+      'FR-108',
+      'FR-116',
+      'FR-117',
+      'FR-118',
+      'FR-119',
+    ],
   },
   {
     operationId: 'publishTournament',

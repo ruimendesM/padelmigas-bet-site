@@ -36,6 +36,19 @@ const serverEnvSchema = z.object({
   RATE_LIMIT_SALT: z
     .string()
     .min(16, 'RATE_LIMIT_SALT must be at least 16 characters; it salts the in-memory IP hash'),
+
+  // Lineup image extraction (FR-101). Deliberately OPTIONAL, unlike everything above: a deployment
+  // without a key is a fully working deployment that answers EXTRACTION_UNAVAILABLE on one endpoint
+  // and keeps hand entry (FR-120, ADR-011). An empty string is normalised to undefined so a blank
+  // line in .env.local means "not configured" rather than "configured with nothing".
+  GEMINI_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v.trim().length === 0 ? undefined : v)),
+  GEMINI_MODEL: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v.trim().length === 0 ? undefined : v)),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -69,6 +82,8 @@ export function serverEnv(): ServerEnv {
     RANKINGS_CSV_URL: process.env.RANKINGS_CSV_URL,
     CRON_SECRET: process.env.CRON_SECRET,
     RATE_LIMIT_SALT: process.env.RATE_LIMIT_SALT,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GEMINI_MODEL: process.env.GEMINI_MODEL,
   });
 
   if (!parsed.success) {

@@ -5,7 +5,7 @@
 // packages/contracts/src/endpoints.ts; editing this file by hand is overwritten on the next run and
 // silently breaks the guarantee that every client speaks the same contract (Principle III).
 //
-// Generated 8 operations.
+// Generated 9 operations.
 
 import type { z } from 'zod';
 import * as contracts from '@padelmigas/contracts';
@@ -21,9 +21,11 @@ export namespace C {
   export type GetPlayerResponse = z.output<(typeof contracts.ENDPOINTS)[4]['response']>;
   export type PreviewLineupResponse = z.output<(typeof contracts.ENDPOINTS)[5]['response']>;
   export type PreviewLineupBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[5]['body']>>;
-  export type PublishTournamentResponse = z.output<(typeof contracts.ENDPOINTS)[6]['response']>;
-  export type PublishTournamentBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[6]['body']>>;
-  export type SyncRankingsResponse = z.output<(typeof contracts.ENDPOINTS)[7]['response']>;
+  export type ExtractLineupResponse = z.output<(typeof contracts.ENDPOINTS)[6]['response']>;
+  export type ExtractLineupBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[6]['body']>>;
+  export type PublishTournamentResponse = z.output<(typeof contracts.ENDPOINTS)[7]['response']>;
+  export type PublishTournamentBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[7]['body']>>;
+  export type SyncRankingsResponse = z.output<(typeof contracts.ENDPOINTS)[8]['response']>;
 }
 
 export interface ClientConfig {
@@ -223,6 +225,22 @@ export function createClient(config: ClientConfig) {
       body: params.body,
       voterDependent: false,
     }) as Promise<C.PreviewLineupResponse>;
+  },
+  /**
+   * Read a lineup screenshot and return candidate rows with suspect values flagged.
+   *
+   * `POST /api/v1/admin/tournaments/extract` — FR-101, FR-102, FR-105, FR-106, FR-107, FR-108, FR-116, FR-117, FR-118, FR-119.
+   * Documented failures: MALFORMED_PAYLOAD, PAYLOAD_TOO_LARGE, EXTRACTION_UNAVAILABLE, EXTRACTION_FAILED, UNAUTHORISED.
+   */
+  async extractLineup(params: { body: C.ExtractLineupBody }): Promise<C.ExtractLineupResponse> {
+    const path = `/admin/tournaments/extract`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      body: params.body,
+      voterDependent: false,
+    }) as Promise<C.ExtractLineupResponse>;
   },
   /**
    * Publish a previously previewed lineup.

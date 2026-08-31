@@ -65,8 +65,8 @@ Each is asserted reachable by the contract test, per the constitution's contract
 | Code | HTTP | Cause |
 |---|---|---|
 | `UNAUTHORISED` | 401 | No organiser session. Checked **before** the body is read, so an unauthenticated caller learns nothing about the schema |
-| `MALFORMED_PAYLOAD` | 400 | Body fails the schema — missing `image`, invalid base64 |
-| `PAYLOAD_TOO_LARGE` | 413 | Decoded image over 5 MB, or an unaccepted `mimeType`. The issue names the limit or the accepted types |
+| `MALFORMED_PAYLOAD` | 400 | Body fails the schema — missing `image`, an unaccepted `mimeType` (the enum rejects it, with the issue path `image.mimeType`), or a `dataBase64` that is not valid base64 |
+| `PAYLOAD_TOO_LARGE` | 413 | Decoded image over 5 MB. The issue names the limit |
 | `EXTRACTION_UNAVAILABLE` | 503 | No reader is configured on this deployment. Distinct from a failed read, because the remedy differs (FR-119) |
 | `EXTRACTION_FAILED` | 502 | The reader ran and produced nothing usable: upstream error, 15 s timeout, non-JSON, or output failing the row schema |
 

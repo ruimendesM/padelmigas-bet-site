@@ -35,9 +35,9 @@ tree in [plan.md](./plan.md).
 
 **Purpose**: configuration and the decision record, both prerequisites for reviewing anything else.
 
-- [ ] T001 Add `GEMINI_API_KEY` and `GEMINI_MODEL` as **optional** server-only variables in `apps/web/src/env.ts`, keeping the existing fail-fast behaviour for required variables untouched — a missing key must leave the app fully functional (FR-120, research D5)
-- [ ] T002 [P] Document both variables under a new `# --- Lineup image extraction (FR-101) ---` section in `.env.example`, marking them optional and stating that the key is server-only and never `NEXT_PUBLIC_`
-- [ ] T003 [P] Write `docs/adr/ADR-011-vision-extraction-provider.md`: the Gemini Flash free-tier choice, the `LineupImageReader` port that makes it swappable, the rejected alternatives from research D1 (tesseract.js, local VLM, other free tiers, TSV paste), and the privacy position — only data already public on the ranking sheet is ever sent, and the ranking list itself never is
+- [X] T001 Add `GEMINI_API_KEY` and `GEMINI_MODEL` as **optional** server-only variables in `apps/web/src/env.ts`, keeping the existing fail-fast behaviour for required variables untouched — a missing key must leave the app fully functional (FR-120, research D5)
+- [X] T002 [P] Document both variables under a new `# --- Lineup image extraction (FR-101) ---` section in `.env.example`, marking them optional and stating that the key is server-only and never `NEXT_PUBLIC_`
+- [X] T003 [P] Write `docs/adr/ADR-011-vision-extraction-provider.md`: the Gemini Flash free-tier choice, the `LineupImageReader` port that makes it swappable, the rejected alternatives from research D1 (tesseract.js, local VLM, other free tiers, TSV paste), and the privacy position — only data already public on the ranking sheet is ever sent, and the ranking list itself never is
 
 ---
 
@@ -48,13 +48,13 @@ can be built before the port and the DTOs exist.
 
 **⚠️ CRITICAL**: no user story work begins until this phase is complete.
 
-- [ ] T004 Add `PAYLOAD_TOO_LARGE`, `EXTRACTION_UNAVAILABLE` and `EXTRACTION_FAILED` to `ERROR_CODES` in `packages/contracts/src/common.ts`, in a new commented group for lineup image extraction
-- [ ] T005 Add the extraction schemas to `packages/contracts/src/tournaments.ts`: `lineupImage` (mimeType enum of `image/png`·`image/jpeg`·`image/webp`, `dataBase64`), `extractLineupBody`, `extractionFlag` enum, `extractionWarning` enum, `extractedRow`, and `lineupExtraction` — shapes exactly per [data-model.md](./data-model.md)
-- [ ] T006 Register the `extractLineup` endpoint in `packages/contracts/src/endpoints.ts` — `POST /admin/tournaments/extract`, `auth: 'organiser'`, `tag: 'admin'`, `successStatus: 200`, `voterDependent: false`, `errors` listing all five documented codes, `requirements: ['FR-101','FR-102','FR-105','FR-106','FR-107','FR-108','FR-116','FR-117','FR-118','FR-119']`
-- [ ] T007 Regenerate the client and the OpenAPI document with `pnpm generate:client && pnpm generate:openapi`, and confirm `pnpm openapi:check` passes with the new endpoint present in `specs/001-group-standings-voting/contracts/openapi.yaml`
-- [ ] T008 [P] Declare the `LineupImageReader` port and the `RawExtractedRow` type in `packages/core/src/ports/index.ts`, next to `RankingSource`, with the "never guess, `null` instead" contract stated in the doc comment (research D9)
-- [ ] T009 [P] Add `readonly imageReader?: LineupImageReader` to `Deps` in `packages/api/src/handler.ts`, documenting that its absence is a supported deployment state, not an error
-- [ ] T010 Add `packages/core/src/lineup-extraction/**/*.ts` to the coverage `include` list in `vitest.config.ts` with the existing 100% thresholds — the file's own comment warns that changing this list is a policy change, so state the reason in the commit
+- [X] T004 Add `PAYLOAD_TOO_LARGE`, `EXTRACTION_UNAVAILABLE` and `EXTRACTION_FAILED` to `ERROR_CODES` in `packages/contracts/src/common.ts`, in a new commented group for lineup image extraction
+- [X] T005 Add the extraction schemas to `packages/contracts/src/tournaments.ts`: `lineupImage` (mimeType enum of `image/png`·`image/jpeg`·`image/webp`, `dataBase64`), `extractLineupBody`, `extractionFlag` enum, `extractionWarning` enum, `extractedRow`, and `lineupExtraction` — shapes exactly per [data-model.md](./data-model.md)
+- [X] T006 Register the `extractLineup` endpoint in `packages/contracts/src/endpoints.ts` — `POST /admin/tournaments/extract`, `auth: 'organiser'`, `tag: 'admin'`, `successStatus: 200`, `voterDependent: false`, `errors` listing all five documented codes, `requirements: ['FR-101','FR-102','FR-105','FR-106','FR-107','FR-108','FR-116','FR-117','FR-118','FR-119']`
+- [X] T007 Regenerate the client and the OpenAPI document with `pnpm generate:client && pnpm generate:openapi`, and confirm `pnpm openapi:check` passes with the new endpoint present in `specs/001-group-standings-voting/contracts/openapi.yaml`
+- [X] T008 [P] Declare the `LineupImageReader` port and the `RawExtractedRow` type in `packages/core/src/ports/index.ts`, next to `RankingSource`, with the "never guess, `null` instead" contract stated in the doc comment (research D9)
+- [X] T009 [P] Add `readonly imageReader?: LineupImageReader` to `Deps` in `packages/api/src/handler.ts`, documenting that its absence is a supported deployment state, not an error
+- [X] T010 Add `packages/core/src/lineup-extraction/**/*.ts` to the coverage `include` list in `vitest.config.ts` with the existing 100% thresholds — the file's own comment warns that changing this list is a policy change, so state the reason in the commit
 
 **Checkpoint**: contract published, seam declared. Stories can begin.
 
@@ -71,24 +71,24 @@ empty; preview and publish behave exactly as for a hand-typed lineup.
 
 ### Tests for User Story 1 ⚠️ write first, watch them fail
 
-- [ ] T011 [P] [US1] Write `packages/core/src/lineup-extraction/normalize.test.ts` covering the happy path: trimming, NFC normalisation, whitespace collapsing, ordering by total descending, rows without a total placed last, `sourceIndex` preserved through the sort
-- [ ] T012 [P] [US1] Write `packages/ui-logic/src/lineup-draft.test.ts` for the draft transitions used by this story: `editCell`, `addRow`, `removeRow`, and `toLineupPayload` producing the existing `lineupPayload` shape with a UTC instant, no `slug`, no `group` labels and no external ids (FR-113, FR-114)
-- [ ] T013 [US1] Write `tests/contract/admin-extract-lineup.test.ts` asserting the documented success shape against a stubbed `imageReader` installed through `setDeps`, plus the `UNAUTHORISED` and `MALFORMED_PAYLOAD` failures — `UNAUTHORISED` asserted for an unparseable body too, proving the guard runs before the body is read
+- [X] T011 [P] [US1] Write `packages/core/src/lineup-extraction/normalize.test.ts` covering the happy path: trimming, NFC normalisation, whitespace collapsing, ordering by total descending, rows without a total placed last, `sourceIndex` preserved through the sort
+- [X] T012 [P] [US1] Write `packages/ui-logic/src/lineup-draft.test.ts` for the draft transitions used by this story: `editCell`, `addRow`, `removeRow`, and `toLineupPayload` producing the existing `lineupPayload` shape with a UTC instant, no `slug`, no `group` labels and no external ids (FR-113, FR-114)
+- [X] T013 [US1] Write `tests/contract/admin-extract-lineup.test.ts` asserting the documented success shape against a stubbed `imageReader` installed through `setDeps`, plus the `UNAUTHORISED` and `MALFORMED_PAYLOAD` failures — `UNAUTHORISED` asserted for an unparseable body too, proving the guard runs before the body is read
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement `normalizeExtraction` in `packages/core/src/lineup-extraction/index.ts` — normalisation, ordering and `sourceIndex` preservation. Flags land in US2; leave the flag array empty here and do not stub anything the tests do not require
-- [ ] T015 [P] [US1] Implement the pure draft transitions in `packages/ui-logic/src/lineup-draft.ts` and export them from `packages/ui-logic/src/index.ts`
-- [ ] T016 [US1] Implement `packages/api/src/handlers/extract-lineup.ts`: reject an unaccepted mime type or an over-cap payload with `PAYLOAD_TOO_LARGE` **before** touching the reader, answer `EXTRACTION_UNAVAILABLE` when `deps.imageReader` is absent, map any reader failure to `EXTRACTION_FAILED`, then return `normalizeExtraction`'s result. Export it from `packages/api/src/index.ts`
-- [ ] T017 [US1] Implement the provider adapter in `apps/web/src/server/lineup-image-reader.ts` — the only file naming Gemini. Plain `fetch` to `generateContent`, the instruction and response schema from [`contracts/extraction-prompt.md`](./contracts/extraction-prompt.md), a 15 s `AbortController` timeout, re-validation of the response against the row schema, `sourceIndex` assigned from array position, and a throw (never a partial salvage) on anything unusable (research D6, D9)
-- [ ] T018 [US1] Wire the reader in `apps/web/src/server/deps.ts`: construct it only when `GEMINI_API_KEY` is present, leaving `imageReader` undefined otherwise, and keep the existing per-process caching
-- [ ] T019 [US1] Add the route adapter `apps/web/app/api/v1/admin/tournaments/extract/route.ts` — `requireOrganiser` before `jsonBody`, one handler call, `respond`, no business branching (Principle II), mirroring the preview route exactly
-- [ ] T020 [P] [US1] Add pt-PT and en copy for the upload control, the two required fields and the new error codes in `apps/web/src/i18n/pt.ts` and `apps/web/src/i18n/en.ts`
-- [ ] T021 [US1] Build `apps/web/app/admin/lineup-upload.tsx` — file input restricted to the three accepted types, client-side size and type pre-check with the server still authoritative (FR-112), base64 encoding, busy state, and a call through the generated client, never a hand-rolled `fetch` (Principle III)
-- [ ] T022 [US1] Build `apps/web/app/admin/lineup-draft-table.tsx` — editable grid over the draft rows (two names, two point values, total, club), add and remove row, driven entirely by the `packages/ui-logic` transitions. Flag rendering is US2
-- [ ] T023 [US1] Wire both components into `apps/web/app/admin/page.tsx`, moving the page to orchestration only: upload replaces the draft and retracts any preview (FR-115), the draft serialises into the existing payload state, and the preview-then-publish flow below is untouched
+- [X] T014 [US1] Implement `normalizeExtraction` in `packages/core/src/lineup-extraction/index.ts` — normalisation, ordering and `sourceIndex` preservation. Flags land in US2; leave the flag array empty here and do not stub anything the tests do not require
+- [X] T015 [P] [US1] Implement the pure draft transitions in `packages/ui-logic/src/lineup-draft.ts` and export them from `packages/ui-logic/src/index.ts`
+- [X] T016 [US1] Implement `packages/api/src/handlers/extract-lineup.ts`: reject an unaccepted mime type or an over-cap payload with `PAYLOAD_TOO_LARGE` **before** touching the reader, answer `EXTRACTION_UNAVAILABLE` when `deps.imageReader` is absent, map any reader failure to `EXTRACTION_FAILED`, then return `normalizeExtraction`'s result. Export it from `packages/api/src/index.ts`
+- [X] T017 [US1] Implement the provider adapter in `apps/web/src/server/lineup-image-reader.ts` — the only file naming Gemini. Plain `fetch` to `generateContent`, the instruction and response schema from [`contracts/extraction-prompt.md`](./contracts/extraction-prompt.md), a 15 s `AbortController` timeout, re-validation of the response against the row schema, `sourceIndex` assigned from array position, and a throw (never a partial salvage) on anything unusable (research D6, D9)
+- [X] T018 [US1] Wire the reader in `apps/web/src/server/deps.ts`: construct it only when `GEMINI_API_KEY` is present, leaving `imageReader` undefined otherwise, and keep the existing per-process caching
+- [X] T019 [US1] Add the route adapter `apps/web/app/api/v1/admin/tournaments/extract/route.ts` — `requireOrganiser` before `jsonBody`, one handler call, `respond`, no business branching (Principle II), mirroring the preview route exactly
+- [X] T020 [P] [US1] Add pt-PT and en copy for the upload control, the two required fields and the new error codes in `apps/web/src/i18n/pt.ts` and `apps/web/src/i18n/en.ts`
+- [X] T021 [US1] Build `apps/web/app/admin/lineup-upload.tsx` — file input restricted to the three accepted types, client-side size and type pre-check with the server still authoritative (FR-112), base64 encoding, busy state, and a call through the generated client, never a hand-rolled `fetch` (Principle III)
+- [X] T022 [US1] Build `apps/web/app/admin/lineup-draft-table.tsx` — editable grid over the draft rows (two names, two point values, total, club), add and remove row, driven entirely by the `packages/ui-logic` transitions. Flag rendering is US2
+- [X] T023 [US1] Wire both components into `apps/web/app/admin/page.tsx`, moving the page to orchestration only: upload replaces the draft and retracts any preview (FR-115), the draft serialises into the existing payload state, and the preview-then-publish flow below is untouched
 - [ ] T024 [US1] Add the E2E happy path `apps/web/tests/e2e/import-lineup-image.spec.ts` with a committed fixture at `apps/web/tests/e2e/fixtures/lineup-12-pairs.png` and the route's upstream stubbed — upload, fill name and start time, preview, publish
-- [ ] T025 [US1] Run `pnpm boundaries` and confirm the new rules-free seam holds: `packages/core` cannot reach `apps/web/src/server/lineup-image-reader.ts` via the existing `packages-no-apps` rule
+- [X] T025 [US1] Run `pnpm boundaries` and confirm the new rules-free seam holds: `packages/core` cannot reach `apps/web/src/server/lineup-image-reader.ts` via the existing `packages-no-apps` rule
 
 **Checkpoint**: a clean screenshot publishes end to end with two typed values (SC-101, SC-106).
 
@@ -105,20 +105,20 @@ clears the marks without re-uploading.
 
 ### Tests for User Story 2 ⚠️ write first, watch them fail
 
-- [ ] T026 [P] [US2] Extend `packages/core/src/lineup-extraction/normalize.test.ts` to cover every flag and warning branch — `MISSING_NAME`, `MISSING_POINTS`, `MISSING_CLUB`, `TOTAL_MISMATCH`, `NO_ROWS_FOUND`, `ODD_ROW_COUNT` — including the boundaries: a total absent (no mismatch flag), a player's points absent (no mismatch flag), negative and non-finite numbers reduced to `null`, and an empty-after-trim name. This suite is what carries the module to the 100% branch threshold set in T010
-- [ ] T027 [P] [US2] Extend `packages/ui-logic/src/lineup-draft.test.ts`: editing a flagged cell to a valid value clears that flag and no other (FR-109); editing a total re-sorts the rows; `isComplete` is false while any required value is empty and **true** with only a `TOTAL_MISMATCH` outstanding
-- [ ] T028 [US2] Extend `tests/contract/admin-extract-lineup.test.ts` with a stub returning the imperfect fixture from [`contracts/extraction-response.example.json`](./contracts/extraction-response.example.json), asserting the flags and warnings arrive verbatim and that no value was repaired server-side (FR-107)
+- [X] T026 [P] [US2] Extend `packages/core/src/lineup-extraction/normalize.test.ts` to cover every flag and warning branch — `MISSING_NAME`, `MISSING_POINTS`, `MISSING_CLUB`, `TOTAL_MISMATCH`, `NO_ROWS_FOUND`, `ODD_ROW_COUNT` — including the boundaries: a total absent (no mismatch flag), a player's points absent (no mismatch flag), negative and non-finite numbers reduced to `null`, and an empty-after-trim name. This suite is what carries the module to the 100% branch threshold set in T010
+- [X] T027 [P] [US2] Extend `packages/ui-logic/src/lineup-draft.test.ts`: editing a flagged cell to a valid value clears that flag and no other (FR-109); editing a total re-sorts the rows; `isComplete` is false while any required value is empty and **true** with only a `TOTAL_MISMATCH` outstanding
+- [X] T028 [US2] Extend `tests/contract/admin-extract-lineup.test.ts` with a stub returning the imperfect fixture from [`contracts/extraction-response.example.json`](./contracts/extraction-response.example.json), asserting the flags and warnings arrive verbatim and that no value was repaired server-side (FR-107)
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement flag and warning derivation in `packages/core/src/lineup-extraction/index.ts` per [data-model.md](./data-model.md) — total and deterministic, never repairing: a mismatched total is kept as read, an unreadable value stays `null`, an unreadable row still appears
-- [ ] T030 [US2] Implement flag clearing and the completeness check in `packages/ui-logic/src/lineup-draft.ts`, with `TOTAL_MISMATCH` explicitly non-blocking (research D3)
-- [ ] T031 [US2] Render flags in `apps/web/app/admin/lineup-draft-table.tsx` — the affected cell marked with its stated reason, using the i18n copy, never a raw code
-- [ ] T032 [P] [US2] Render row-set warnings (`NO_ROWS_FOUND`, `ODD_ROW_COUNT`) as a banner above the table in `apps/web/app/admin/page.tsx`, distinct from per-cell marks (FR-108)
-- [ ] T033 [US2] Gate the preview button on `isComplete`, naming the incomplete rows when it refuses (FR-110)
-- [ ] T034 [P] [US2] Add the pt-PT and en copy for every flag, warning and refusal message in `apps/web/src/i18n/{pt,en}.ts`
+- [X] T029 [US2] Implement flag and warning derivation in `packages/core/src/lineup-extraction/index.ts` per [data-model.md](./data-model.md) — total and deterministic, never repairing: a mismatched total is kept as read, an unreadable value stays `null`, an unreadable row still appears
+- [X] T030 [US2] Implement flag clearing and the completeness check in `packages/ui-logic/src/lineup-draft.ts`, with `TOTAL_MISMATCH` explicitly non-blocking (research D3)
+- [X] T031 [US2] Render flags in `apps/web/app/admin/lineup-draft-table.tsx` — the affected cell marked with its stated reason, using the i18n copy, never a raw code
+- [X] T032 [P] [US2] Render row-set warnings (`NO_ROWS_FOUND`, `ODD_ROW_COUNT`) as a banner above the table in `apps/web/app/admin/page.tsx`, distinct from per-cell marks (FR-108)
+- [X] T033 [US2] Gate the preview button on `isComplete`, naming the incomplete rows when it refuses (FR-110)
+- [X] T034 [P] [US2] Add the pt-PT and en copy for every flag, warning and refusal message in `apps/web/src/i18n/{pt,en}.ts`
 - [ ] T035 [US2] Extend `apps/web/tests/e2e/import-lineup-image.spec.ts` with the correction path: a stubbed imperfect extraction, assert the marked cells, correct one, assert its mark clears, then preview and publish
-- [ ] T036 [US2] Run `pnpm test:unit:coverage` and confirm `packages/core/src/lineup-extraction` reaches 100% branch, function, line and statement coverage
+- [X] T036 [US2] Run `pnpm test:unit:coverage` and confirm `packages/core/src/lineup-extraction` reaches 100% branch, function, line and statement coverage
 
 **Checkpoint**: imperfect screenshots are usable, and no misread can pass unmarked (SC-104).
 
@@ -133,13 +133,13 @@ control explains that extraction is unavailable, and a publish completes through
 
 ### Tests for User Story 3 ⚠️ write first, watch them fail
 
-- [ ] T037 [US3] Extend `tests/contract/admin-extract-lineup.test.ts` with the two remaining documented codes: `EXTRACTION_UNAVAILABLE` for `Deps` assembled without an `imageReader`, and `EXTRACTION_FAILED` for a reader that throws and for one that returns output failing the row schema — asserting neither surfaces as `INTERNAL_ERROR`
-- [ ] T038 [P] [US3] Extend `tests/contract/admin-extract-lineup.test.ts` with `PAYLOAD_TOO_LARGE` for both causes — an over-cap image and an unaccepted mime type — asserting the stub reader was never called
+- [X] T037 [US3] Extend `tests/contract/admin-extract-lineup.test.ts` with the two remaining documented codes: `EXTRACTION_UNAVAILABLE` for `Deps` assembled without an `imageReader`, and `EXTRACTION_FAILED` for a reader that throws and for one that returns output failing the row schema — asserting neither surfaces as `INTERNAL_ERROR`
+- [X] T038 [P] [US3] Extend `tests/contract/admin-extract-lineup.test.ts` with `PAYLOAD_TOO_LARGE` for both causes — an over-cap image and an unaccepted mime type — asserting the stub reader was never called
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Render the unavailable state in `apps/web/app/admin/lineup-upload.tsx`: wording distinct from a failed read (FR-119), with the hand-entry path visibly available alongside it
-- [ ] T040 [P] [US3] Add pt-PT and en copy for `EXTRACTION_UNAVAILABLE`, `EXTRACTION_FAILED` and `PAYLOAD_TOO_LARGE` in `apps/web/src/i18n/{pt,en}.ts`, phrased so the organiser knows which remedy applies
+- [X] T039 [US3] Render the unavailable state in `apps/web/app/admin/lineup-upload.tsx`: wording distinct from a failed read (FR-119), with the hand-entry path visibly available alongside it
+- [X] T040 [P] [US3] Add pt-PT and en copy for `EXTRACTION_UNAVAILABLE`, `EXTRACTION_FAILED` and `PAYLOAD_TOO_LARGE` in `apps/web/src/i18n/{pt,en}.ts`, phrased so the organiser knows which remedy applies
 - [ ] T041 [US3] Confirm the existing `apps/web/tests/e2e/publish-lineup.spec.ts` still passes unchanged, proving the hand-entry path survived the page split (FR-120)
 
 **Checkpoint**: all three stories independently functional.
@@ -148,11 +148,11 @@ control explains that extraction is unavailable, and a publish completes through
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T042 Warn before navigating away from an unsaved draft in `apps/web/app/admin/page.tsx` (FR-121), and confirm no draft state is written server-side or to storage
-- [ ] T043 Audit that the image never reaches a log or an error message: grep the adapter, the handler and the route for any logging of `dataBase64`, `mimeType` or the provider response, and confirm error issues carry no image data (FR-118, SC-107)
-- [ ] T044 [P] Update `README.md` — add feature 002 to the spec-driven table, describe the image import in "How it works", and note `GEMINI_API_KEY` as optional configuration
-- [ ] T045 [P] Update `specs/002-lineup-image-import/contracts/README.md` if the generated OpenAPI ended up differing from the documented request or response shape
-- [ ] T046 Run every gate: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm boundaries && pnpm openapi:check && pnpm test:unit:coverage && pnpm test:contract && pnpm test:e2e`
+- [X] T042 Warn before navigating away from an unsaved draft in `apps/web/app/admin/page.tsx` (FR-121), and confirm no draft state is written server-side or to storage
+- [X] T043 Audit that the image never reaches a log or an error message: grep the adapter, the handler and the route for any logging of `dataBase64`, `mimeType` or the provider response, and confirm error issues carry no image data (FR-118, SC-107)
+- [X] T044 [P] Update `README.md` — add feature 002 to the spec-driven table, describe the image import in "How it works", and note `GEMINI_API_KEY` as optional configuration
+- [X] T045 [P] Update `specs/002-lineup-image-import/contracts/README.md` if the generated OpenAPI ended up differing from the documented request or response shape
+- [X] T046 Run every gate: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm boundaries && pnpm openapi:check && pnpm test:unit:coverage && pnpm test:contract && pnpm test:e2e`
 - [ ] T047 Walk [quickstart.md](./quickstart.md) V1–V6 by hand against a running app, including the manual SC-103 accuracy check with three real screenshots
 
 ---
@@ -225,3 +225,29 @@ require an API key to function. Build it before the feature ships publicly, not 
 rate limiting beyond the organiser gate. Each was considered and rejected in
 [research.md](./research.md); building one anyway is a Principle V violation and needs a spec change
 first.
+
+---
+
+## Execution notes (2026-08-31)
+
+- **T014 / T029**: flag derivation shipped with the normalisation pass rather than in a second edit.
+  Splitting one pure function across two phases would have meant writing a placeholder and replacing
+  it; the US2 *tests* (T026) were still written before the behaviour they cover was exercised.
+- **T024 / T035 (E2E)**: written and type-checked, not yet run. `pnpm test:e2e` cannot start locally —
+  `apps/web/.env.local` has a placeholder `ADMIN_PASSWORD_HASH`, so the landing page 500s on env
+  validation and Playwright's `webServer` never reports ready. Pre-existing and unrelated to this
+  feature (reproduced on a clean stash of this branch). Both specs skip themselves without
+  `E2E_ADMIN_PASSWORD` and `E2E_LINEUP_JSON` anyway. To run: generate a real hash with
+  `pnpm tsx scripts/hash-admin-password.ts`, sync the ranking, then set both E2E variables.
+- **T024 fixture**: the uploaded bytes are a 1×1 PNG built in the spec rather than a committed
+  screenshot. With the endpoint intercepted the image's content is irrelevant, and committing a real
+  lineup screenshot would put real player names in the repository, which feature 001 avoids
+  deliberately.
+- **T039**: the unavailable state is reported from the endpoint's `EXTRACTION_UNAVAILABLE` response
+  rather than from a flag rendered before any attempt. That keeps the deployment's configuration off
+  the client, and the copy is distinct from a failed read, which is what FR-119 asks for.
+- **T041**: `publish-lineup.spec.ts` is unchanged and still type-checks; running it is blocked by the
+  same missing local environment as above.
+- **T047**: the manual quickstart walkthrough (V1–V6, including the SC-103 accuracy check against
+  real screenshots) needs a `GEMINI_API_KEY` and a synced database, so it is outstanding.
+- Contract suite was run against a local scratch Postgres: `TEST_DATABASE_URL=postgresql://<user>@localhost:5432/padelmigas_test`.

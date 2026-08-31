@@ -9,3 +9,4 @@ export * from './format.js';
 export * from './query.js';
 export * from './ballot.js';
 export * from './results.js';
+export * from './lineup-draft.js';
