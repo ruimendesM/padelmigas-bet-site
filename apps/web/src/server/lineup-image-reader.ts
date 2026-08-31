@@ -24,7 +24,22 @@ import type { LineupImageInput, LineupImageReader, RawExtractedRow } from '@pade
  * `specs/002-lineup-image-import/contracts/extraction-prompt.md`. Keep the two in step.
  */
 
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+/**
+ * Measured, not guessed (2026-08-31, against a 12-row lineup screenshot with the prompt below).
+ *
+ * | model                 | latency          | wrong cells |
+ * |-----------------------|------------------|-------------|
+ * | gemini-3.5-flash-lite | 2.9–3.0 s (4×)   | 0 / 72      |
+ * | gemini-3.1-flash-lite | 4.7 s            | 0 / 72      |
+ * | gemini-3.6-flash      | 13 s, 54 s, >90 s| 0 / 72      |
+ *
+ * The reasoning models are as accurate and wildly slower: `gemini-3.6-flash` spent ~1500 thought
+ * tokens deliberating over a transcription task and blew the timeout on one run in three. Reading a
+ * table needs no deliberation, so the lite model is the right tool — and it keeps SC-102's
+ * ten-second budget with room to spare. Re-measure when changing this; the table above is the reason
+ * it is not a reasoning model.
+ */
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
 /** One attempt, then fail. SC-102 allows ten seconds to a draft or a clear failure; a retry would
  * double the worst case, and with one organiser doing this monthly the right retry is manual

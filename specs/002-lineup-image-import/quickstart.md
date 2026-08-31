@@ -11,7 +11,7 @@ One new optional variable, plus one optional override:
 ```bash
 # apps/web/.env.local
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-3.6-flash   # optional; the adapter has a default
+GEMINI_MODEL=gemini-3.5-flash-lite   # optional; the adapter has a default
 ```
 
 `GEMINI_API_KEY` is **optional by design** (FR-120, research D5). With it absent the app runs

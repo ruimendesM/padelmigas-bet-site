@@ -21,8 +21,17 @@ Extraction enters the system as a **port**, `LineupImageReader`, declared in
 `packages/core/src/ports/index.ts` beside `RankingSource`. It has one method, `read(image)`, returning
 raw rows in which every field is nullable.
 
-Its single implementation calls **Google Gemini Flash** (free tier) over plain `fetch` against the
-REST `generateContent` endpoint, with a structured-output schema. No SDK is added. That
+Its single implementation calls **Google Gemini** (free tier) over plain `fetch` against the REST
+`generateContent` endpoint, with a structured-output schema. No SDK is added.
+
+The model is a **lite, non-reasoning** one — `gemini-3.5-flash-lite` at the time of writing. Measured
+on a twelve-row lineup screenshot with the committed prompt: the lite model read all seventy-two
+cells correctly in 2.9–3.0 s across four runs, while `gemini-3.6-flash` was exactly as accurate and
+took 13 s, 54 s, then over 90 s on three consecutive runs, spending some 1500 thought tokens
+deliberating over a transcription. Reading a table is not a reasoning task, and SC-102 allows ten
+seconds to a visible draft, so the deliberation buys nothing and costs the budget. `GEMINI_MODEL`
+overrides the default; the measurements sit next to it in the adapter, and changing it means
+re-measuring. That
 implementation lives in `apps/web/src/server/lineup-image-reader.ts` and is the only file in the
 repository that names a vision provider; it is reached only through `Deps`.
 
@@ -61,6 +70,10 @@ The ranking list is **never** sent to the provider as context.
   and by exact-name resolution against the ranking sheet, which fails loudly on anything unmatched.
 - Extraction can be rate-limited or unreachable, which is why "unavailable" is a first-class state
   with its own error code rather than a failure mode.
+- Model ids are retired. `gemini-2.0-flash`, the id chosen when this was written, returned 404 within
+  days. The failure is a clean `EXTRACTION_FAILED` with `upstream-status-404` in the server log and
+  the remedy is one environment variable — but it will recur, and it is the maintenance cost this
+  decision accepts.
 - A future standalone API host would have to re-provide the adapter file, since it lives in the web
   host rather than a shared package. Accepted: it is one file, and it is a host capability.
 
