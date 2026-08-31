@@ -233,12 +233,14 @@ first.
 - **T014 / T029**: flag derivation shipped with the normalisation pass rather than in a second edit.
   Splitting one pure function across two phases would have meant writing a placeholder and replacing
   it; the US2 *tests* (T026) were still written before the behaviour they cover was exercised.
-- **T024 / T035 (E2E)**: written and type-checked, not yet run. `pnpm test:e2e` cannot start locally —
-  `apps/web/.env.local` has a placeholder `ADMIN_PASSWORD_HASH`, so the landing page 500s on env
-  validation and Playwright's `webServer` never reports ready. Pre-existing and unrelated to this
-  feature (reproduced on a clean stash of this branch). Both specs skip themselves without
-  `E2E_ADMIN_PASSWORD` and `E2E_LINEUP_JSON` anyway. To run: generate a real hash with
-  `pnpm tsx scripts/hash-admin-password.ts`, sync the ranking, then set both E2E variables.
+- **T024 / T035 / T041 (E2E)**: written, type-checked, and the harness now runs — all three specs
+  skip themselves cleanly, because they need `E2E_ADMIN_PASSWORD` (the organiser's plaintext
+  password) and `E2E_LINEUP_JSON` (pairs that exist in the synced ranking), which only the operator
+  has. Two local blockers were found and cleared on the way, both pre-existing and unrelated to this
+  feature: Playwright's Chromium was not downloaded (`pnpm exec playwright install chromium`), and
+  `ADMIN_PASSWORD_HASH` in `apps/web/.env.local` had unescaped `$`, which Next's env loader expands
+  as variable references — the hash arrived mangled and every server-rendered page 500'd on env
+  validation. Escaping each `$` as `\$` fixed it; `.env.example` now documents that.
 - **T024 fixture**: the uploaded bytes are a 1×1 PNG built in the spec rather than a committed
   screenshot. With the endpoint intercepted the image's content is irrelevant, and committing a real
   lineup screenshot would put real player names in the repository, which feature 001 avoids
