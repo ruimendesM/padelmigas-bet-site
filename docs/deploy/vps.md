@@ -98,6 +98,8 @@ sudo editor /etc/padelmigas/env
 | `RANKINGS_CSV_URL` | The club sheet's CSV export. Not committed anywhere — this repo is public |
 | `CRON_SECRET` | ≥32 chars. `openssl rand -hex 32`. The timer presents this as a bearer token |
 | `RATE_LIMIT_SALT` | ≥16 chars. Salts the in-memory IP hash |
+| `GEMINI_API_KEY` | **Optional.** Enables reading a lineup from an uploaded screenshot (feature 002). Free-tier key from Google AI Studio. Absent, the site is fully functional and the upload answers `EXTRACTION_UNAVAILABLE` |
+| `GEMINI_MODEL` | **Optional.** Overrides the adapter's default (`gemini-3.5-flash-lite`). Set it when Google retires that id — the symptom is `upstream-status-404` in the journal |
 
 The pooler requirement has two independent reasons: burst connections when a tournament opens
 (Risk R8), and the fact that Supabase's direct endpoint resolves to **IPv6 only**, which neither
@@ -108,6 +110,25 @@ host differs too, so a URI that is correct apart from the port fails to authenti
 Quotes around values are stripped by systemd, which does understand shell-style quoting here — but
 write them unquoted anyway. It removes any question of what the value actually is, and it lets a
 check like `grep '^ADMIN_PASSWORD_HASH=\$argon2id\$'` mean what it appears to mean.
+
+Dollars are **literal** here. systemd does no variable expansion in an `EnvironmentFile`, so
+`ADMIN_PASSWORD_HASH` is written exactly as generated. This differs from a local
+`apps/web/.env.local`, where Next expands `$NAME` references and every `$` must be escaped `\$` —
+copying a line from one to the other in either direction will produce a hash that fails validation.
+
+Adding a variable later — `GEMINI_API_KEY`, say — is an append plus a **restart**; systemd reads the
+file only at start, so a reload is not enough:
+
+```bash
+sudo sh -c 'printf "GEMINI_API_KEY=%s\n" "PASTE_THE_KEY" >> /etc/padelmigas/env'
+sudo systemctl restart padelmigas
+```
+
+Then confirm the process actually has it, without printing it:
+
+```bash
+sudo tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value padelmigas)/environ | awk -F= '/^GEMINI_API_KEY=/{print "GEMINI_API_KEY", length($2), "chars"}'
+```
 
 Verify without printing any secret:
 
