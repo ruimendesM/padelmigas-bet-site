@@ -4,6 +4,7 @@ import type {
   Clock,
   GroupRepository,
   HistoryRepository,
+  LineupImageReader,
   PairRepository,
   PlayerRepository,
   RankingSource,
@@ -44,6 +45,14 @@ export interface Deps {
   readonly results: ResultsRepository;
   readonly history: HistoryRepository;
   readonly rankings: RankingSource;
+  /**
+   * Reads a lineup screenshot (FR-101).
+   *
+   * Optional, and its absence is a supported deployment state rather than a misconfiguration: with
+   * no extraction configured the product is fully usable through hand entry, and the one endpoint
+   * that needs it answers `EXTRACTION_UNAVAILABLE` (FR-119, FR-120, ADR-011).
+   */
+  readonly imageReader?: LineupImageReader;
 }
 
 /**

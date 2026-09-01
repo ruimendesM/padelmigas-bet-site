@@ -66,6 +66,14 @@ export const HTTP_STATUS_BY_CODE: Readonly<Record<ErrorCode, number>> = {
   // Ranking import
   DUPLICATE_MATCH_KEY: 409,
 
+  // Lineup image extraction
+  PAYLOAD_TOO_LARGE: 413,
+  // Not configured on this deployment. A capability the operator has not enabled, not a fault of
+  // the request and not a 500 (FR-119, ADR-011).
+  EXTRACTION_UNAVAILABLE: 503,
+  // The reader ran and produced nothing usable: upstream error, timeout, or unparseable output.
+  EXTRACTION_FAILED: 502,
+
   // Casting a ballot
   INCOMPLETE_BALLOT: 400,
   DUPLICATE_POSITION: 400,

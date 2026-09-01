@@ -11,8 +11,9 @@ walkthrough, a first-use timing study, and the RLS half of the security review �
 
 ## How it works
 
-1. The organiser pastes a lineup (pairs, players, ranking points, clubs) into the admin page and
-   confirms the preview. Pairs are grouped in sixes by ranking; every player is resolved against the
+1. The organiser uploads a screenshot of the lineup table — or pastes the lineup as a structured
+   payload — into the admin page, fills in the tournament name and start time, and confirms the
+   preview. Pairs are grouped in sixes by ranking; every player is resolved against the
    club's published ranking list, so one person is one record across all tournaments.
 2. Visitors rank the pairs in a group from 1st to 6th. One ballot per group per device, cast once.
 3. After voting — or once the tournament starts and voting closes — the group's results appear: the
@@ -27,7 +28,8 @@ before code, and they are the reviewable artifact:
 | Where | What |
 |-------|------|
 | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) | Project principles — the non-negotiables every change is checked against |
-| [`specs/001-group-standings-voting/spec.md`](specs/001-group-standings-voting/spec.md) | What the feature does, in user-observable terms |
+| [`specs/001-group-standings-voting/spec.md`](specs/001-group-standings-voting/spec.md) | What the voting feature does, in user-observable terms |
+| [`specs/002-lineup-image-import/spec.md`](specs/002-lineup-image-import/spec.md) | Importing a lineup from a screenshot of the ranking table |
 | [`specs/001-group-standings-voting/plan.md`](specs/001-group-standings-voting/plan.md) | Architecture, structure, risks |
 | [`specs/001-group-standings-voting/data-model.md`](specs/001-group-standings-voting/data-model.md) | Schema, constraints, the scoring formula |
 | [`specs/001-group-standings-voting/contracts/`](specs/001-group-standings-voting/contracts/) | API contract (OpenAPI) and an example lineup payload |
@@ -65,6 +67,20 @@ pnpm dev
 ```
 
 The organiser page is at `/admin`; the public site is at `/`.
+
+### Optional: importing a lineup from an image
+
+The organiser can upload a screenshot of the lineup table instead of typing it. That needs one
+optional variable:
+
+```bash
+GEMINI_API_KEY=...
+```
+
+Without it the app runs exactly as before — the upload reports that extraction is unavailable and the
+hand-entry path is unaffected. What the image contains is read once, in memory, and never stored; see
+[`docs/adr/ADR-011-vision-extraction-provider.md`](docs/adr/ADR-011-vision-extraction-provider.md)
+for why the provider sits behind a port and what was rejected.
 
 ### Checks
 

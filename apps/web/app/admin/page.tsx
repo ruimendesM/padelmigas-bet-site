@@ -1,11 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import type { LineupPreviewDto } from '@padelmigas/contracts';
+import { useEffect, useState } from 'react';
+import type { LineupExtractionDto, LineupPreviewDto } from '@padelmigas/contracts';
 import { ApiRequestError, type C } from '@padelmigas/client';
-import { formatPairName, formatPoints, formatStartsAt } from '@padelmigas/ui-logic';
+import {
+  createLineupDraft,
+  formatPairName,
+  formatPoints,
+  formatStartsAt,
+  incompleteRows,
+  isLineupDraftComplete,
+  toLineupPayload,
+  type LineupDraft,
+} from '@padelmigas/ui-logic';
 import { api } from '../../src/api.js';
 import { t } from '../../src/i18n/index.js';
+import { LineupDraftTable } from './lineup-draft-table.js';
+import { LineupUpload } from './lineup-upload.js';
 
 /**
  * The organiser page (FR-002, FR-006).
@@ -30,6 +41,15 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [signedIn, setSignedIn] = useState(false);
   const [payload, setPayload] = useState('');
+  /**
+   * The draft read from an image, when there is one (FR-103).
+   *
+   * Client-side only and never persisted: leaving the page discards it (FR-121). It is not a second
+   * source of truth either — every edit re-serialises into `payload`, so preview and publish keep
+   * working on exactly one payload, whether it was typed or read from an image.
+   */
+  const [draft, setDraft] = useState<LineupDraft | null>(null);
+  const [warnings, setWarnings] = useState<LineupExtractionDto['warnings']>([]);
   const [preview, setPreview] = useState<LineupPreviewDto | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +81,36 @@ export default function AdminPage() {
     setPreview(null);
     setIssues([]);
     setError(null);
+  }
+
+  /**
+   * A fresh extraction replaces whatever draft was there and retracts the preview (FR-115).
+   *
+   * The payload is cleared rather than serialised yet: the two required fields are still empty, and
+   * a half-filled payload in the textarea would invite publishing it.
+   */
+  function acceptExtraction(extraction: LineupExtractionDto): void {
+    setDraft(createLineupDraft(extraction.rows));
+    setWarnings(extraction.warnings);
+    setPayload('');
+    setPreview(null);
+    setIssues([]);
+    setError(null);
+    setNotice(null);
+  }
+
+  /**
+   * Every draft edit re-serialises into the payload, once the draft is complete.
+   *
+   * While it is incomplete the payload stays empty, which is what keeps the preview button
+   * unavailable without a second rule to maintain (FR-110).
+   */
+  function editDraft(next: LineupDraft): void {
+    setDraft(next);
+    setPreview(null);
+    setIssues([]);
+    setError(null);
+    setPayload(isLineupDraftComplete(next) ? JSON.stringify(toLineupPayload(next), null, 2) : '');
   }
 
   function parsePayload(): unknown | null {
@@ -126,6 +176,8 @@ export default function AdminPage() {
       setNotice(t.admin.published);
       setPreview(null);
       setPayload('');
+      setDraft(null);
+      setWarnings([]);
     } catch (failure) {
       fail(failure);
     } finally {
@@ -152,6 +204,22 @@ export default function AdminPage() {
       setBusy('none');
     }
   }
+
+  /**
+   * Warns before an unsaved draft is thrown away (FR-121).
+   *
+   * A draft is two minutes of correcting cells and is not persisted anywhere, so a stray reload
+   * would cost the whole import. The warning is the browser's own; nothing is saved to compensate.
+   */
+  useEffect(() => {
+    if (draft === null) return undefined;
+
+    function warn(event: BeforeUnloadEvent): void {
+      event.preventDefault();
+    }
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [draft]);
 
   if (!signedIn) {
     return (
@@ -210,6 +278,64 @@ export default function AdminPage() {
         <p role="status" className="text-accent mt-3 text-sm">
           {notice}
         </p>
+      ) : null}
+
+      <LineupUpload onExtracted={acceptExtraction} onFailure={fail} disabled={busy !== 'none'} />
+
+      {/* Row-set problems, reported apart from per-cell marks: every row can look fine and the set
+          still be wrong (FR-108). */}
+      {warnings.length > 0 ? (
+        <ul role="status" className="text-danger mt-3 space-y-1 text-xs">
+          {warnings.map((warning) => (
+            <li key={warning}>
+              {warning === 'NO_ROWS_FOUND'
+                ? t.admin.warningNO_ROWS_FOUND
+                : t.admin.warningODD_ROW_COUNT}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {draft !== null ? (
+        <>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm" htmlFor="draft-name">
+                {t.admin.draftName}{' '}
+                <span className="text-ink-muted text-xs">({t.admin.draftRequired})</span>
+              </label>
+              <input
+                id="draft-name"
+                value={draft.name}
+                onChange={(event) => editDraft({ ...draft, name: event.target.value })}
+                disabled={busy !== 'none'}
+                className="bg-surface border-border mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm" htmlFor="draft-starts-at">
+                {t.admin.draftStartsAt}{' '}
+                <span className="text-ink-muted text-xs">({t.admin.draftRequired})</span>
+              </label>
+              <input
+                id="draft-starts-at"
+                type="datetime-local"
+                value={draft.startsAtLocal}
+                onChange={(event) => editDraft({ ...draft, startsAtLocal: event.target.value })}
+                disabled={busy !== 'none'}
+                className="bg-surface border-border mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+              />
+            </div>
+          </div>
+
+          <LineupDraftTable draft={draft} onChange={editDraft} disabled={busy !== 'none'} />
+
+          {incompleteRows(draft).length > 0 ? (
+            <p role="status" className="text-danger mt-3 text-xs">
+              {t.admin.draftIncomplete(incompleteRows(draft).length)}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       <label className="mt-6 block text-sm" htmlFor="lineup-payload">

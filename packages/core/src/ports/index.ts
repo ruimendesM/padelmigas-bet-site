@@ -291,5 +291,47 @@ export interface RankingSource {
   lastSnapshot(): Promise<RankingFetch | null>;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Lineup image extraction
+// ---------------------------------------------------------------------------------------------
+
+/** An uploaded lineup screenshot, in flight. Never persisted, never logged (FR-118). */
+export interface LineupImageInput {
+  readonly mimeType: string;
+  readonly bytes: Uint8Array;
+}
+
+/**
+ * One candidate pair as read from an image, before any normalisation.
+ *
+ * Every field is nullable and that is the point: a reader that cannot read a value must say so
+ * rather than fill the gap. A guessed number is an error nothing downstream can detect, while a
+ * `null` becomes a flagged cell the organiser fixes in seconds (FR-107, research D3).
+ */
+export interface RawExtractedRow {
+  readonly player1Name: string | null;
+  readonly player2Name: string | null;
+  readonly player1Points: number | null;
+  readonly player2Points: number | null;
+  /** As read from the total column. Never the sum of the two player values. */
+  readonly totalPoints: number | null;
+  readonly club: string | null;
+}
+
+/**
+ * Whatever reads a lineup screenshot (FR-101, ADR-011).
+ *
+ * Deliberately one method wide. The implementation is a vendor call and lives in the host, so this
+ * interface is the entire seam: swapping the provider replaces one file and touches nothing else.
+ *
+ * `read` must **fail rather than degrade**. Output that cannot be trusted — an upstream error, a
+ * timeout, a response that does not match the expected shape — throws, and the caller reports
+ * `EXTRACTION_FAILED`. It must never partially salvage a bad response, and must never invent a row
+ * to make the count even.
+ */
+export interface LineupImageReader {
+  read(image: LineupImageInput): Promise<readonly RawExtractedRow[]>;
+}
+
 /** Re-exported so implementers get one import for the whole port surface. */
 export type { Group, GroupWithPairs, Pair, Player, Tournament, TournamentWithGroups, Voter };

@@ -58,6 +58,13 @@ export const ERROR_CODES = [
   // Ranking import (FR-004)
   'DUPLICATE_MATCH_KEY',
 
+  // Lineup image extraction (FR-117, FR-119)
+  // Three codes rather than one, because the organiser's remedy differs: shrink the file, configure
+  // a key, or try another image. A missing key must never surface as INTERNAL_ERROR (ADR-011).
+  'PAYLOAD_TOO_LARGE',
+  'EXTRACTION_UNAVAILABLE',
+  'EXTRACTION_FAILED',
+
   // Casting a ballot (FR-009 – FR-013)
   'INCOMPLETE_BALLOT',
   'DUPLICATE_POSITION',

@@ -98,6 +98,8 @@ sudo editor /etc/padelmigas/env
 | `RANKINGS_CSV_URL` | The club sheet's CSV export. Not committed anywhere — this repo is public |
 | `CRON_SECRET` | ≥32 chars. `openssl rand -hex 32`. The timer presents this as a bearer token |
 | `RATE_LIMIT_SALT` | ≥16 chars. Salts the in-memory IP hash |
+| `GEMINI_API_KEY` | **Optional.** Enables reading a lineup from an uploaded screenshot (feature 002). Free-tier key from Google AI Studio. Absent, the site is fully functional and the upload answers `EXTRACTION_UNAVAILABLE` |
+| `GEMINI_MODEL` | **Optional.** Overrides the adapter's default (`gemini-3.5-flash-lite`). Set it when Google retires that id — the symptom is `upstream-status-404` in the journal |
 
 The pooler requirement has two independent reasons: burst connections when a tournament opens
 (Risk R8), and the fact that Supabase's direct endpoint resolves to **IPv6 only**, which neither
@@ -108,6 +110,37 @@ host differs too, so a URI that is correct apart from the port fails to authenti
 Quotes around values are stripped by systemd, which does understand shell-style quoting here — but
 write them unquoted anyway. It removes any question of what the value actually is, and it lets a
 check like `grep '^ADMIN_PASSWORD_HASH=\$argon2id\$'` mean what it appears to mean.
+
+Dollars are **literal** here. systemd does no variable expansion in an `EnvironmentFile`, so
+`ADMIN_PASSWORD_HASH` is written exactly as generated. This differs from a local
+`apps/web/.env.local`, where Next expands `$NAME` references and every `$` must be escaped `\$` —
+copying a line from one to the other in either direction will produce a hash that fails validation.
+
+Adding a variable later — `GEMINI_API_KEY`, say — is an append plus a **restart**; systemd reads the
+file only at start, so a reload is not enough:
+
+```bash
+sudo sh -c 'printf "GEMINI_API_KEY=%s\n" "PASTE_THE_KEY" >> /etc/padelmigas/env'
+sudo systemctl restart padelmigas
+```
+
+Then confirm the process actually has it, without printing it:
+
+```bash
+PID=$(systemctl show -p MainPID --value padelmigas)
+sudo cat /proc/$PID/environ | tr '\0' '\n' | awk -F= '/^GEMINI_API_KEY=/{print "present,", length($2), "chars"}'
+```
+
+`sudo cat`, not `sudo tr < file`: the redirection is performed by the calling shell, which is
+unprivileged, so `sudo tr '\0' '\n' < /proc/…/environ` fails with `Permission denied` before sudo
+runs anything. The value itself never reaches the terminal either way.
+
+If the line is in the file but the process does not have it, the unit was not restarted after the
+append:
+
+```bash
+sudo systemctl show -p ExecMainStartTimestamp --value padelmigas
+```
 
 Verify without printing any secret:
 
@@ -172,6 +205,40 @@ This repository starts with none. All three are required by
 
 Prefer a **fresh keypair for this repository** over reusing the one the other services share: one
 compromised key then cannot move all three.
+
+Generate the keypair with no passphrase — CI has nobody to type one — and store the private half
+without it ever reaching a clipboard:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/padelmigas_deploy -C "github-actions padelmigas deploy" -N ""
+gh secret set DEPLOY_KEY < ~/.ssh/padelmigas_deploy
+```
+
+**Verify the key by fingerprint, not by logging in.** Two traps, both hit on the first real setup:
+
+- `ssh-copy-id` reported *"All keys were skipped because they already exist on the remote system"*
+  for a key that was **not** installed, and exited 0. It never wrote anything. `-f` forces the copy
+  and skips that detection.
+- `ssh -i <key> -o IdentitiesOnly=yes <alias>` **is not proof the key works.** `IdentitiesOnly` still
+  permits identities named in `~/.ssh/config`, so the login succeeded on a personal key while the
+  deploy key was absent — and the failure only surfaced in Actions, as
+  `Permission denied (publickey,password)`.
+
+Compare fingerprints instead, which cannot pass by accident:
+
+```bash
+ssh-keygen -lf ~/.ssh/padelmigas_deploy.pub
+ssh <host> 'while read -r l; do [ -n "$l" ] && echo "$l" | ssh-keygen -lf - 2>/dev/null; done < ~/.ssh/authorized_keys'
+```
+
+The first fingerprint must appear in the second list. Then exercise the key with everything else
+switched off — no agent, no config:
+
+```bash
+SSH_AUTH_SOCK= ssh -F /dev/null -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes \
+  -i ~/.ssh/padelmigas_deploy <user>@<host> \
+  'whoami; sudo -n systemctl restart padelmigas.service; mkdir -p /opt/padelmigas/releases/_probe && rmdir /opt/padelmigas/releases/_probe && echo writable'
+```
 
 ---
 

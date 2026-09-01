@@ -114,6 +114,41 @@ export const en: Messages = {
     syncReport: (created: number, updated: number) =>
       `${created} players created, ${updated} updated.`,
     syncStale: 'The ranking sheet is unreachable; the last stored copy was used.',
+
+    // Lineup image import (feature 002)
+    uploadHeading: 'Import from an image',
+    uploadHint:
+      'Choose a screenshot of the lineup table (PNG, JPEG or WebP, up to 5 MB). Names and points are read from the image; only the tournament name and start time are left to fill in.',
+    uploadChoose: 'Choose image',
+    uploadReading: 'Reading the image…',
+    uploadUnavailable:
+      'Image reading is not configured on this installation. Enter the lineup by hand below.',
+    uploadTooLargeLocal: (megabytes: number) => `The image is larger than ${megabytes} MB.`,
+    uploadWrongType: 'Unsupported format. Use PNG, JPEG or WebP.',
+    draftHeading: 'Lineup read from the image',
+    draftName: 'Tournament name',
+    draftStartsAt: 'Start (Lisbon time)',
+    draftRequired: 'required',
+    draftPlayer1: 'Player 1',
+    draftPlayer2: 'Player 2',
+    draftPoints1: 'PTS P1',
+    draftPoints2: 'PTS P2',
+    draftTotal: 'Total points',
+    draftClub: 'Club',
+    draftAddRow: 'Add pair',
+    draftRemoveRow: 'Remove pair',
+    draftIncomplete: (rows: number) =>
+      `${rows} ${rows === 1 ? 'pair is' : 'pairs are'} missing values. Fill them in before previewing.`,
+    draftDiscardWarning:
+      'The lineup read from the image has not been published. Leaving discards it.',
+    flagMISSING_NAME: 'Name not read from the image.',
+    flagMISSING_POINTS: 'Points not read from the image.',
+    flagMISSING_CLUB: 'Club not read from the image.',
+    flagTOTAL_MISMATCH:
+      'The total does not match the sum of the two players. Check which is right.',
+    warningNO_ROWS_FOUND: 'No lineup table was found in the image.',
+    warningODD_ROW_COUNT:
+      'An odd number of pairs was read. Check whether a row is missing or extra.',
   },
 
   errors: {
@@ -137,6 +172,10 @@ export const en: Messages = {
     ALREADY_VOTED: 'You have already voted in this group.',
     VOTING_CLOSED: 'Voting has closed.',
     RESULTS_HIDDEN: 'Vote to see the results.',
+    PAYLOAD_TOO_LARGE: 'The image is too large. The limit is 5 MB.',
+    EXTRACTION_UNAVAILABLE: 'Image reading is not configured. Enter the lineup by hand.',
+    EXTRACTION_FAILED:
+      'The image could not be read. Try another image, or enter the lineup by hand.',
     NETWORK_ERROR: 'Could not reach the server.',
   },
 };

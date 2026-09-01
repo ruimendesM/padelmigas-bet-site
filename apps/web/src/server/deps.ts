@@ -1,6 +1,7 @@
 import type { Deps } from '@padelmigas/api';
 import { createRepositories, getSql } from '@padelmigas/db';
 import { serverEnv } from '../env.js';
+import { createGeminiLineupImageReader } from './lineup-image-reader.js';
 
 /**
  * The ONLY module in `apps/web` permitted to import `packages/db`.
@@ -26,7 +27,22 @@ export function getDeps(): Deps {
   const env = serverEnv();
   const sql = getSql({ connectionString: env.DATABASE_URL });
 
-  cached = createRepositories(sql, { rankingsCsvUrl: env.RANKINGS_CSV_URL });
+  const repositories = createRepositories(sql, { rankingsCsvUrl: env.RANKINGS_CSV_URL });
+
+  // Extraction is optional configuration, so this capability is optional too: with no key the
+  // product is fully usable and the one endpoint that needs it answers EXTRACTION_UNAVAILABLE
+  // (FR-119, FR-120, ADR-011).
+  cached =
+    env.GEMINI_API_KEY === undefined
+      ? repositories
+      : {
+          ...repositories,
+          imageReader: createGeminiLineupImageReader({
+            apiKey: env.GEMINI_API_KEY,
+            ...(env.GEMINI_MODEL === undefined ? {} : { model: env.GEMINI_MODEL }),
+          }),
+        };
+
   return cached;
 }
 

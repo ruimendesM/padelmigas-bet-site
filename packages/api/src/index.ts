@@ -7,6 +7,7 @@
  */
 export type { CallerContext, Deps, Handler, NullaryHandler, VoterScoped } from './handler.js';
 export { previewLineup } from './handlers/preview-lineup.js';
+export { extractLineup } from './handlers/extract-lineup.js';
 export { publishTournament } from './handlers/publish-tournament.js';
 export { syncRankings } from './handlers/sync-rankings.js';
 export { listTournaments } from './handlers/list-tournaments.js';
