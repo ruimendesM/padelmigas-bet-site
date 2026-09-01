@@ -127,7 +127,19 @@ sudo systemctl restart padelmigas
 Then confirm the process actually has it, without printing it:
 
 ```bash
-sudo tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value padelmigas)/environ | awk -F= '/^GEMINI_API_KEY=/{print "GEMINI_API_KEY", length($2), "chars"}'
+PID=$(systemctl show -p MainPID --value padelmigas)
+sudo cat /proc/$PID/environ | tr '\0' '\n' | awk -F= '/^GEMINI_API_KEY=/{print "present,", length($2), "chars"}'
+```
+
+`sudo cat`, not `sudo tr < file`: the redirection is performed by the calling shell, which is
+unprivileged, so `sudo tr '\0' '\n' < /proc/…/environ` fails with `Permission denied` before sudo
+runs anything. The value itself never reaches the terminal either way.
+
+If the line is in the file but the process does not have it, the unit was not restarted after the
+append:
+
+```bash
+sudo systemctl show -p ExecMainStartTimestamp --value padelmigas
 ```
 
 Verify without printing any secret:
