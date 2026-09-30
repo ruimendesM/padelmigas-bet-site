@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ApiErrorWithIssues, RankingsSyncResponse } from '@padelmigas/contracts';
+import {
+  rankingsSyncResponse,
+  type ApiErrorWithIssues,
+  type PlayerDetailDto,
+  type RankingsSyncResponse,
+} from '@padelmigas/contracts';
 import { POST } from '../../apps/web/app/api/v1/admin/rankings/sync/route.js';
+import { GET as getPlayer } from '../../apps/web/app/api/v1/players/[playerId]/route.js';
 import { rankingCsv } from '../factories/index.js';
 import { rawSql } from './harness.js';
-import { body, current, install, organiserCookie } from './helpers.js';
+import { body, current, getRequest, install, organiserCookie, params } from './helpers.js';
 
 /**
- * `POST /api/v1/admin/rankings/sync` (FR-004).
+ * `POST /api/v1/admin/rankings/sync` (FR-004, FR-027).
  *
  * The import is the identity spine of the whole product: every lineup name is resolved against what
  * this writes. So the two failure behaviours matter more than the success one — an ambiguous sheet
@@ -47,9 +53,130 @@ describe('POST /api/v1/admin/rankings/sync', () => {
     expect(report.rowsRead).toBe(3);
     expect(report.playersCreated).toBe(3);
     expect(report.playersUpdated).toBe(0);
-    // Two dated columns per player.
-    expect(report.snapshotsWritten).toBe(6);
+    // One per player, from column C: the second dated column is not read (FR-027).
+    expect(report.snapshotsWritten).toBe(3);
     expect(report.stale).toBe(false);
+    expect(report.ratedOn).toBe('2026-08-26');
+    expect(report.ratedOnBasis).toBe('header');
+    // The documented success shape, strictly — the new fields included.
+    expect(rankingsSyncResponse.strict().parse(report)).toEqual(report);
+  });
+
+  it("stores column C's points under its header date and nothing from later columns", async () => {
+    const test = current();
+    test.ranking.csv = SHEET;
+
+    await POST(syncRequest({ cookie: await organiserCookie() }));
+
+    const rows = await rawSql()`
+      select p.match_key, r.rated_on::text as rated_on, r.points
+      from player_ratings r join players p on p.id = r.player_id
+      order by p.match_key
+    `;
+    expect(rows.map((row) => [row['match_key'], row['rated_on'], row['points']])).toEqual([
+      ['alice ferreira', '2026-08-26', 420],
+      ['bruno marques', '2026-08-26', 380],
+      ['carla nogueira', '2026-08-26', 310],
+    ]);
+  });
+
+  it('shows column C as the current points on the player page', async () => {
+    const test = current();
+    test.ranking.csv = SHEET;
+    await POST(syncRequest({ cookie: await organiserCookie() }));
+
+    const [alice] = await rawSql()`select id from players where match_key = 'alice ferreira'`;
+    const id = String(alice?.['id']);
+    const response = await getPlayer(
+      getRequest(`http://localhost/api/v1/players/${id}`),
+      params({ playerId: id }),
+    );
+    expect((await body<PlayerDetailDto>(response)).currentPoints).toBe(420);
+  });
+
+  it('stores a future-dated column C under the sync day instead', async () => {
+    // `09-12-2026` is 12 September written month-first; read day-first it is 9 December, which
+    // would outrank every later sync and freeze current points (FR-027). Clock: 1 September.
+    const test = current();
+    test.ranking.csv = rankingCsv([{ id: 101, name: 'Alice Ferreira', points: [420] }], {
+      dateHeaders: ['09-12-2026'],
+    });
+
+    const report = await body<RankingsSyncResponse>(
+      await POST(syncRequest({ cookie: await organiserCookie() })),
+    );
+    expect(report.ratedOn).toBe('2026-09-01');
+    expect(report.ratedOnBasis).toBe('header-in-future');
+    const rows = await rawSql()`select rated_on::text as rated_on from player_ratings`;
+    expect(rows.map((row) => row['rated_on'])).toEqual(['2026-09-01']);
+  });
+
+  it('stores a column C older than the newest stored date under the sync day, so it stays current', async () => {
+    const test = current();
+    const cookie = await organiserCookie();
+    test.ranking.csv = SHEET;
+    await POST(syncRequest({ cookie }));
+
+    // `10-03-2026` read day-first is 10 March: below the 26 August already stored.
+    test.ranking.csv = rankingCsv([{ id: 101, name: 'Alice Ferreira', points: [455] }], {
+      dateHeaders: ['10-03-2026'],
+    });
+    const report = await body<RankingsSyncResponse>(await POST(syncRequest({ cookie })));
+    expect(report.ratedOn).toBe('2026-09-01');
+    expect(report.ratedOnBasis).toBe('header-before-stored');
+
+    const [alice] = await rawSql()`select id from players where match_key = 'alice ferreira'`;
+    const id = String(alice?.['id']);
+    const player = await body<PlayerDetailDto>(
+      await getPlayer(
+        getRequest(`http://localhost/api/v1/players/${id}`),
+        params({ playerId: id }),
+      ),
+    );
+    expect(player.currentPoints).toBe(455);
+  });
+
+  it('stores an unparseable column C header under the sync day', async () => {
+    const test = current();
+    test.ranking.csv = rankingCsv([{ id: 101, name: 'Alice Ferreira', points: [420] }], {
+      dateHeaders: ['08-08-20262'],
+    });
+    const report = await body<RankingsSyncResponse>(
+      await POST(syncRequest({ cookie: await organiserCookie() })),
+    );
+    expect(report.ratedOn).toBe('2026-09-01');
+    expect(report.ratedOnBasis).toBe('header-unparseable');
+  });
+
+  it('imports players and writes no points when column C is entirely empty', async () => {
+    const test = current();
+    test.ranking.csv = ['ID,Nome,26/08/2026', '101,"Alice Ferreira",', '102,"Bruno Marques",'].join(
+      '\n',
+    );
+    const response = await POST(syncRequest({ cookie: await organiserCookie() }));
+    expect(response.status).toBe(200);
+    const report = await body<RankingsSyncResponse>(response);
+    expect(report.playersCreated).toBe(2);
+    expect(report.snapshotsWritten).toBe(0);
+    expect((await rawSql()`select count(*)::int as count from player_ratings`)[0]?.['count']).toBe(
+      0,
+    );
+  });
+
+  it('aborts with nothing written when column C is not points', async () => {
+    const test = current();
+    test.ranking.csv = [
+      'ID,Nome,Clube,26/08/2026',
+      '101,"Alice Ferreira","Clube Norte",420',
+      '102,"Bruno Marques","Clube Sul",380',
+    ].join('\n');
+
+    const response = await POST(syncRequest({ cookie: await organiserCookie() }));
+    expect(response.status).toBe(400);
+    expect((await body<ApiErrorWithIssues>(response)).code).toBe('MALFORMED_PAYLOAD');
+    const sql = rawSql();
+    expect((await sql`select count(*)::int as count from players`)[0]?.['count']).toBe(0);
+    expect((await sql`select count(*)::int as count from ranking_snapshots`)[0]?.['count']).toBe(0);
   });
 
   it('is idempotent: a second run creates nobody and updates everybody', async () => {
@@ -157,6 +284,13 @@ describe('POST /api/v1/admin/rankings/sync', () => {
     const report = await body<RankingsSyncResponse>(response);
     expect(report.stale).toBe(true);
     expect(report.rowsRead).toBe(3);
+    // The stored copy goes through the same date rule; its header equals the newest stored date,
+    // so the re-import rewrites the same rows (FR-027).
+    expect(report.ratedOn).toBe('2026-08-26');
+    expect(report.ratedOnBasis).toBe('header');
+    expect((await rawSql()`select count(*)::int as count from player_ratings`)[0]?.['count']).toBe(
+      3,
+    );
     // Falling back must not multiply copies of the same bytes.
     const snapshots = await rawSql()`select count(*)::int as count from ranking_snapshots`;
     expect(snapshots[0]?.['count']).toBe(1);

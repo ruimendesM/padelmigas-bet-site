@@ -1,6 +1,8 @@
 import type { RankingsSyncResponse } from '@padelmigas/contracts';
 import type { PlayerId } from '@padelmigas/contracts/common';
 import {
+  calendarDayIn,
+  chooseRatedOn,
   domainError,
   isDomainError,
   parseRankingCsv,
@@ -10,9 +12,10 @@ import {
 import type { NullaryHandler } from '../handler.js';
 
 /**
- * Imports the public ranking sheet into players and dated rating snapshots (FR-004).
+ * Imports the public ranking sheet into players and one rating per player, from column C (FR-004,
+ * FR-027).
  *
- * Three properties this ordering exists to guarantee:
+ * Four properties this ordering exists to guarantee:
  *
  *  1. **Nothing is written until the whole sheet parses.** `parseRankingCsv` aborts on an ambiguous
  *     identity (ADR-007), and it runs before the first insert, so a `DUPLICATE_MATCH_KEY` leaves the
@@ -21,8 +24,13 @@ import type { NullaryHandler } from '../handler.js';
  *  2. **An unreachable sheet degrades rather than fails.** The last stored snapshot is re-imported
  *     and the report says `stale: true` (Risk R3). Publishing must not be blocked because Google was
  *     briefly unavailable.
- *  3. **Re-running changes nothing.** Players upsert on `external_id` and snapshots upsert on
- *     `(player_id, rated_on)`, so a scheduler firing twice is a no-op the second time.
+ *  3. **Re-running changes nothing on the same day.** Players upsert on `match_key` and snapshots
+ *     upsert on `(player_id, rated_on)`. When the sync day stands in for column C's date, a re-run
+ *     on a later day writes the same points under that day — current points are unchanged (FR-027).
+ *  4. **The newest date is the current one.** Current points are the newest-dated rating per player,
+ *     so column C's points must never be stored under a date older than one already on record, or
+ *     in the future. `chooseRatedOn` decides, from the header, the sync day and the newest stored
+ *     date, before anything is written.
  */
 export const syncRankings: NullaryHandler<RankingsSyncResponse> = async (deps) => {
   let fetched: RankingFetch;
@@ -52,6 +60,13 @@ export const syncRankings: NullaryHandler<RankingsSyncResponse> = async (deps) =
 
   // Parse first — see property (1).
   const parsed = parseRankingCsv(fetched.csv);
+
+  // Read before the first write, so this sync's own rows cannot be the "newest stored" — property (4).
+  const { ratedOn, basis } = chooseRatedOn({
+    headerRatedOn: parsed.headerRatedOn,
+    syncDay: calendarDayIn(deps.clock.now()),
+    latestStored: await deps.ratings.latestRatedOn(),
+  });
 
   // Only a live fetch is worth keeping; re-storing the fallback would multiply copies of the same
   // bytes every time the sheet stayed down.
@@ -83,7 +98,7 @@ export const syncRankings: NullaryHandler<RankingsSyncResponse> = async (deps) =
     // A snapshot whose player did not come back from the upsert cannot be written; skipping it is
     // safe because the row is re-imported on the next run, and inventing a player id is not.
     if (!playerId) continue;
-    snapshots.push({ playerId, ratedOn: snapshot.ratedOn, points: snapshot.points });
+    snapshots.push({ playerId, ratedOn, points: snapshot.points });
   }
 
   const snapshotsWritten = await deps.ratings.upsertSnapshots(snapshots);
@@ -95,6 +110,8 @@ export const syncRankings: NullaryHandler<RankingsSyncResponse> = async (deps) =
     snapshotsWritten,
     sourceFetchedAt: fetched.fetchedAt.toISOString(),
     stale,
+    ratedOn,
+    ratedOnBasis: basis,
   };
 };
 

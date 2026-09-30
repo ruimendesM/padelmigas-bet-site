@@ -11,6 +11,7 @@ export * from './matching/index.js';
 export * from './lineup/index.js';
 export * from './lineup-extraction/index.js';
 export * from './rankings/parse.js';
+export * from './rankings/rated-on.js';
 export * from './window/index.js';
 export * from './ballot/index.js';
 export * from './scoring/index.js';

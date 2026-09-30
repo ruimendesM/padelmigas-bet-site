@@ -261,8 +261,8 @@ export function createClient(config: ClientConfig) {
   /**
    * Import the public ranking sheet into players and rating snapshots.
    *
-   * `POST /api/v1/admin/rankings/sync` — FR-004, FR-007.
-   * Documented failures: DUPLICATE_MATCH_KEY, UNAUTHORISED.
+   * `POST /api/v1/admin/rankings/sync` — FR-004, FR-007, FR-027.
+   * Documented failures: DUPLICATE_MATCH_KEY, MALFORMED_PAYLOAD, UNAUTHORISED.
    */
   async syncRankings(_params?: undefined): Promise<C.SyncRankingsResponse> {
     const path = '/admin/rankings/sync';

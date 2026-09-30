@@ -95,7 +95,7 @@ sudo editor /etc/padelmigas/env
 | `DATABASE_URL` | Supabase **transaction pooler, port 6543** — never the direct 5432 endpoint |
 | `VOTER_COOKIE_SECRET` | ≥32 chars. `openssl rand -base64 48` |
 | `ADMIN_PASSWORD_HASH` | argon2id PHC string. `pnpm tsx scripts/hash-admin-password.ts 'the password'` |
-| `RANKINGS_CSV_URL` | The club sheet's CSV export. Not committed anywhere — this repo is public |
+| `RANKINGS_CSV_URL` | The club sheet's CSV export, `…/export?format=csv` with **no `gid`**. Not committed anywhere — this repo is public. See [the sheet answers 400](#the-sheet-answers-400) |
 | `CRON_SECRET` | ≥32 chars. `openssl rand -hex 32`. The timer presents this as a bearer token |
 | `RATE_LIMIT_SALT` | ≥16 chars. Salts the in-memory IP hash |
 | `GEMINI_API_KEY` | **Optional.** Enables reading a lineup from an uploaded screenshot (feature 002). Free-tier key from Google AI Studio. Absent, the site is fully functional and the upload answers `EXTRACTION_UNAVAILABLE` |
@@ -308,6 +308,70 @@ Note that a failed sync degrades gracefully: `ranking_snapshots` is the document
 unreachable sheet (Risk R3, data-model.md), so the site keeps serving the last known ratings rather
 than breaking. It is not an outage, but it does go unnoticed,
 which is the whole reason for the alert unit.
+
+### The sheet answers 400
+
+**This one does not trigger the alert.** An unreachable sheet is the fallback case above, so the sync
+answers 200 with `"stale": true` and the timer counts it as a success. Read the body, not the exit
+code:
+
+```bash
+journalctl -u padelmigas-rankings.service -n 5 --output cat
+```
+
+If `stale` stays `true` across runs, fetch the URL by hand. HTTP 400 with an HTML "Página não
+encontrada" page means `RANKINGS_CSV_URL` pins a `gid` that no longer exists. That happened in
+September 2026, when the sheet was re-uploaded as a workbook and its tab got a new id. Remove the
+`&gid=…` part (without it, the export returns the first tab), then restart both units — systemd reads
+`EnvironmentFile` only at start:
+
+```bash
+sudo systemctl restart padelmigas.service padelmigas-rankings.service
+```
+
+### Reading the sync report
+
+Only the sheet's column C is imported — each player's current points (FR-027). The report says which
+date they were stored under:
+
+| `ratedOnBasis` | Meaning |
+| -------------- | ------- |
+| `header` | Column C's header date |
+| `header-unparseable` | Header is not a date (e.g. a mistyped year); the sync day was used |
+| `header-in-future` | Header reads as a future date — usually a month-first date like `09-12-2026` for 12 September; the sync day was used |
+| `header-before-stored` | Header is older than the newest date already stored; the sync day was used so these points stay current |
+
+Anything but `header` is harmless for current points, but worth telling the sheet's maintainer about.
+
+### One-off: remove future-dated ratings before the first column-C sync
+
+Run this **once, before the first sync of the release that brings FR-027**, in the Supabase SQL
+editor. Before that release, the sync read every dated column, and any month-first header it read as a
+future date (`09-12-2026` → 9 December) left rows that outrank every later sync and freeze current
+points. The new sync cannot remove them, because it treats the newest stored date as the current one.
+
+List them first, and keep the output with the release notes:
+
+```sql
+select rated_on, count(*) as players
+from player_ratings
+where rated_on > (now() at time zone 'Europe/Lisbon')::date
+group by rated_on
+order by rated_on;
+```
+
+No rows means nothing to do. Otherwise, delete them, printing each deleted row as a record:
+
+```sql
+begin;
+delete from player_ratings
+where rated_on > (now() at time zone 'Europe/Lisbon')::date
+returning player_id, rated_on, points;
+commit;
+```
+
+Then run the sync (`sudo systemctl start padelmigas-rankings.service`) and check that its report reads
+`"stale": false`.
 
 ## When the site is down
 

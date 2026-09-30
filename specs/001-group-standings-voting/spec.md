@@ -258,6 +258,37 @@ cross-tournament appearances are all correct.
   without requiring them, so that comparing prediction to reality can be added later without
   discarding data collected now.
 
+**Ranking import**
+
+- **FR-027**: The system MUST take a player's current ranking points from the ranking list's third
+  column (column C) alone, identified by position, and MUST ignore every later column. It MUST abort
+  the import, writing nothing, when column C is the identifier or name column, or when more than one
+  in ten of its non-empty cells is not a non-negative integer. When column C has no non-empty cell
+  at all, players MUST still be imported and no points written, so current points keep their last
+  values. The imported points MUST be dated with
+  column C's header date, unless that header does not parse as a date, is later than the day of the
+  sync, or is earlier than the newest date already stored — in each of those cases the day of the
+  sync (`Europe/Lisbon`) is used instead. The import report MUST state which date was used and why.
+
+  > **Amended 2026-09-30.** The import previously read every dated column as rating history. By
+  > 2026-09-28 the list's headers mixed day-first dates with month-first ones for days 1–12 —
+  > `09-12-2026` is 12 September but parsed as 9 December — plus a mistyped year (`08-08-20262`).
+  > The parser accepted all of them without error, so 7 of 26 columns were misdated or dropped, one
+  > of them dated in the future. "Current points" is the newest-dated value per player, so a single
+  > future-dated column would have shown stale points on every player page and lineup preview.
+  > Nothing visible used the older columns: tournament points come from the payload (FR-007). The
+  > list is maintained by a third party and its headers cannot be corrected at the source.
+  >
+  > **Accepted cost**: a header that is wrong but still a valid, non-future date later than
+  > anything stored is still taken at face value, so its points carry the wrong date. Current points
+  > stay correct, because that date is still the newest; only the date shown alongside them is wrong.
+  > Rating history before this amendment is kept as it is, except rows dated in the future, which
+  > are removed once by hand before the first sync (they would outrank every later one); history is
+  > no longer collected from the
+  > list, only one value per sync. Re-running a sync is idempotent on the same day; when the sync
+  > day is used, a re-run on a later day writes the same points under the new day, which leaves
+  > current points unchanged.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Player**: one real person. The normalised match key derived from the name is the canonical
@@ -265,7 +296,8 @@ cross-tournament appearances are all correct.
   informational metadata and is not unique. Also display name and current club. Exists independently
   of any tournament.
 - **Ranking snapshot**: a player's ranking points as published on a given date, used to populate and
-  refresh player data and to capture points at publish time.
+  refresh player data and to capture points at publish time. One per player per sync, read from the
+  list's column C and dated per FR-027 (amended 2026-09-30).
 - **Tournament**: a named event with a start instant that also serves as the voting deadline, a
   publication state, and a creation time. Owns groups.
 - **Group**: a subset of a tournament's pairs — normally six — that play each other; the unit of

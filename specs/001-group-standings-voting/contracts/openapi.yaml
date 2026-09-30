@@ -1407,7 +1407,7 @@ paths:
       tags:
         - admin
       summary: Import the public ranking sheet into players and rating snapshots
-      description: "Requirements: FR-004, FR-007."
+      description: "Requirements: FR-004, FR-007, FR-027."
       responses:
         "200":
           description: Import the public ranking sheet into players and rating snapshots
@@ -1433,6 +1433,16 @@ paths:
                     format: date-time
                   stale:
                     type: boolean
+                  ratedOn:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}$
+                  ratedOnBasis:
+                    type: string
+                    enum:
+                      - header
+                      - header-unparseable
+                      - header-in-future
+                      - header-before-stored
                 required:
                   - rowsRead
                   - playersCreated
@@ -1440,7 +1450,15 @@ paths:
                   - snapshotsWritten
                   - sourceFetchedAt
                   - stale
+                  - ratedOn
+                  - ratedOnBasis
                 additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
         "401":
           description: "`UNAUTHORISED`"
           content:

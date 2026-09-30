@@ -297,6 +297,33 @@ change rather than a schema-only one. Without them the migration lands green and
 fails.
 
 
+## Phase 11: Import column C only (2026-09-30)
+
+Recorded per Principle I before any code changes. Rationale and accepted cost: FR-027 and research F1
+§ Amendment 2026-09-30. Triggered by the sheet re-upload of 2026-09-28: the pinned `gid` answered 400,
+and once reachable the dated headers mixed day-first and month-first dates the parser could not tell
+apart. No schema change.
+
+- [X] T128 [P] Unit tests in `packages/core/src/rankings/parse.test.ts`: points come from column C only and later columns are ignored even when their headers are malformed; the import aborts with `MALFORMED_PAYLOAD` when `ID` or `Nome` sits in column C, when the header has fewer than three columns, and when more than one in ten non-empty column C cells is not a non-negative integer; a column C with no non-empty cell imports every player and yields no snapshots; column C's raw header and its parsed date (or `null`) are reported (FR-027)
+- [X] T129 [P] Unit tests for the date rule in `packages/core/src/rankings/rated-on.test.ts`, one per branch: valid header used; unparseable header, future header, and header earlier than the newest stored date each fall back to the sync day; a header equal to the newest stored date is used, so a re-run stays idempotent; the sync day is the `Europe/Lisbon` calendar date of the instant, including across the UTC midnight boundary (FR-027)
+- [X] T130 Add `ratedOn` (`YYYY-MM-DD`) and `ratedOnBasis` (`header` \| `header-unparseable` \| `header-in-future` \| `header-before-stored`) to `rankingsSyncResponse` in `packages/contracts/src/tournaments.ts`, then regenerate with `pnpm generate:client && pnpm generate:openapi` and confirm `pnpm openapi:check` passes (FR-027, Principle III)
+- [X] T131 [P] Contract tests in `tests/contract/admin-rankings-sync.test.ts`: one snapshot per player per sync; the report carries `ratedOn` and `ratedOnBasis`; a future-dated column C header is stored under the sync day; `currentPoints` on the player detail endpoint is column C's value after the sync; with the sheet unreachable, the last stored CSV is re-imported under the same date rule and reported `stale: true`. Update the existing count assertions that assumed one snapshot per dated column (FR-027)
+- [X] T132 Rewrite `parseRankingCsv` in `packages/core/src/rankings/parse.ts` to read column C by position with the guards T128 tests; replace `latestRatedOn` with the column C header and its parsed date. Identity rules are unchanged (FR-004, FR-027)
+- [X] T133 Add the pure date rule and the `Europe/Lisbon` calendar-day helper in `packages/core/src/rankings/rated-on.ts`, exported from `@padelmigas/core`. `Intl` only, no new dependency (Principle II, Principle V). Add `packages/core/src/rankings/**/*.ts` to the coverage `include` in `vitest.config.ts` with its reason, and bring `parse.ts` to 100% branch coverage (plan § Amendment 2026-09-30)
+- [X] T134 Apply the rule in `packages/api/src/handlers/sync-rankings.ts`: read `ratings.latestRatedOn()` and `clock.now()` before writing, stamp every snapshot with the chosen date, return `ratedOn` and `ratedOnBasis`. Parsing still precedes the first write (FR-004, FR-027)
+- [X] T135 Update the `rankingCsv` factory in `tests/factories/index.ts` if needed so fixtures can set column C's header text, keeping every name fictional
+- [X] T136 Document in `docs/deploy/vps.md` that `RANKINGS_CSV_URL` must not pin a `gid`, and how to recognise the 400 it causes. Update quickstart: the setup line's "dated rating snapshots" and V6.1's idempotence scope (FR-027 accepted cost)
+- [X] T137 Add a one-off runbook step to `docs/deploy/vps.md`, run by the maintainer on production **before** the first sync after this change: list `player_ratings` rows dated after today, record them, delete them. A row the old parser future-dated outranks every later sync and freezes current points (plan § Amendment 2026-09-30)
+- [ ] T138 After T137 has been run, run all gates, then the import against the live sheet; record rows read, snapshots written, `ratedOn` and `ratedOnBasis`, then re-run to confirm idempotence (quickstart V6). **Partly done 2026-09-30**: every gate green (unit 210, contract 98, branch coverage 100% on the gated modules including `rankings/**`); the parser and date rule dry-run against the live sheet read 257 rows and 257 points under header `26/09/2026`, basis `header`. The production run of T137's runbook and the live import need the maintainer
+
+### Task count (column C)
+
+11 tasks: unit tests 2, contracts + codegen 1, contract tests 1, implementation 3, fixtures 1, docs 2,
+verification 1.
+
+T137 and the empty-column and stale cases in T128 and T131 were added on 2026-09-30 by
+`/speckit-analyze`, together with the plan amendment it found missing.
+
 ---
 
 ## Dependencies & Execution Order
@@ -376,8 +403,8 @@ first release rather than a follow-up.
 
 ### Task count
 
-127 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12,
-Principle III 4, Deploy 10.
+138 tasks: Setup 12, Foundational 18, US1 24, US2 15, US3 13, US4 8, Polish 11, Amendment 12,
+Principle III 4, Deploy 10, Column C 11.
 
 The Amendment phase (T102–T113) was added on 2026-08-28, after Phase 7, when the first import against
 the real ranking sheet revealed that the source's `ID` column is not unique. It is a correctness fix

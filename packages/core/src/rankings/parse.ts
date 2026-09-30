@@ -3,16 +3,23 @@ import { DomainError } from '../errors.js';
 import { toMatchKey } from '../matching/index.js';
 
 /**
- * Ranking-sheet CSV parsing (FR-004, research F1, ADR-007).
+ * Ranking-sheet CSV parsing (FR-004, FR-027, research F1, ADR-007).
  *
- * The sheet's real shape, observed on 2026-08-27: `ID`, `Nome`, then 17 dated rating columns, most
- * recent first, with date headers inconsistently formatted — `26/08/2026` and `22-08-2026` both
- * occur. So the parser is tolerant about *format* and strict about *identity*:
+ * The sheet's real shape: `ID`, `Nome`, then dated rating columns, most recent first. Only column C —
+ * the current points — is read (FR-027, amended 2026-09-30). The later columns were once imported as
+ * history, until their headers turned out to mix day-first and month-first dates that no parser can
+ * tell apart. So the parser is tolerant about *format*, strict about *identity*, and suspicious of
+ * column C:
  *
- *  - A malformed rating cell drops that snapshot; the player still imports.
+ *  - A malformed column C cell drops that player's points; the player still imports.
+ *  - More than one malformed cell in ten means column C is probably not points any more, and
+ *    **aborts the whole import**, as does finding the id or name column in column C.
  *  - A row without a usable id or name is skipped and counted, so the sync can report it.
- *  - Two rows that normalise to the same name, or share an id, **abort the whole import**. Guessing
- *    which identity a lineup name refers to is the one failure this system must never have.
+ *  - Two rows that normalise to the same name **abort the whole import**. Guessing which identity a
+ *    lineup name refers to is the one failure this system must never have.
+ *
+ * The parser reports column C's header and its parsed date but does not decide the date the points
+ * are stored under: that needs the clock and the store, so `chooseRatedOn` makes it in the handler.
  *
  * Hand-written rather than a CSV library: the format is one file with quoted fields and the rules
  * above are the interesting part, so a dependency would carry more risk than code (Principle V).
@@ -34,8 +41,7 @@ export interface ParsedSnapshot {
    * import failed with `ON CONFLICT DO UPDATE command cannot affect row a second time`.
    */
   readonly matchKey: string;
-  /** `YYYY-MM-DD`, parsed from the column header. */
-  readonly ratedOn: string;
+  /** Column C's value. Undated here; the handler dates it (FR-027). */
   readonly points: number;
 }
 
@@ -46,21 +52,22 @@ export interface ParsedRankings {
   readonly rowsRead: number;
   /** Rows dropped for an unusable id or name — surfaced so a shape change is visible. */
   readonly skippedRows: number;
-  /** Newest date seen in the headers, or `null` when the sheet had no usable dates. */
-  readonly latestRatedOn: string | null;
+  /** Column C's header exactly as the sheet has it, for the sync report. */
+  readonly ratingHeader: string;
+  /** Column C's header parsed as a day-first date, or `null` when it is not one. */
+  readonly headerRatedOn: string | null;
 }
 
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
-
-function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-}
+/** Column C, zero-based: `ID` and `Nome` come first (FR-027). */
+const RATING_COLUMN = 2;
 
 /**
  * Parses a dated column header into `YYYY-MM-DD`, or `null` when it is not a date.
  *
  * Accepts `dd/mm/yyyy` and `dd-mm-yyyy` because both appear in the same sheet. Day-first, not
- * month-first: the sheet is Portuguese, so `26/08/2026` is 26 August.
+ * month-first: the sheet is Portuguese, so `26/08/2026` is 26 August. Some headers are in fact
+ * month-first (`09-12-2026` is 12 September); they parse to a different valid date, which this
+ * function cannot detect. `chooseRatedOn` is where that is caught (FR-027).
  */
 export function parseSheetDateHeader(header: string): string | null {
   const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(header.trim());
@@ -72,9 +79,9 @@ export function parseSheetDateHeader(header: string): string | null {
 
   if (month < 1 || month > 12) return null;
 
-  const monthIndex = month - 1;
-  const maxDay = monthIndex === 1 && isLeapYear(year) ? 29 : (DAYS_IN_MONTH[monthIndex] ?? 0);
-  if (day < 1 || day > maxDay) return null;
+  // Day 0 of the following month is the last day of this one, leap years included.
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day < 1 || day > daysInMonth) return null;
 
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
@@ -169,22 +176,27 @@ export function parseRankingCsv(csv: string): ParsedRankings {
     ]);
   }
 
-  // Every remaining column that parses as a date is a rating column. Anything else (a club column,
-  // a stray note) is ignored rather than guessed at.
-  const dateColumns: { index: number; ratedOn: string }[] = [];
-  header.forEach((cell, index) => {
-    if (index === idIndex || index === nameIndex) return;
-    const ratedOn = parseSheetDateHeader(cell);
-    if (ratedOn !== null) dateColumns.push({ index, ratedOn });
-  });
-
-  if (dateColumns.length === 0) {
-    fail('A folha de ranking não tem nenhuma coluna com data.', [
+  // Column C is found by position, because that is what the sheet's maintainer means by "current
+  // points" (FR-027). The guards below exist because a position, unlike a header, cannot say it has
+  // moved: without them an inserted column would be imported as points with no complaint.
+  const ratingHeader = header[RATING_COLUMN];
+  if (ratingHeader === undefined) {
+    fail('A folha de ranking não tem coluna C.', [
       {
         path: 'csv',
         message:
-          `Cabeçalho encontrado: ${header.join(', ')}. As colunas datadas são a origem do ` +
-          'histórico de pontos; a sua ausência significa que a folha mudou de formato.',
+          `Cabeçalho encontrado: ${header.join(', ')}. A coluna C tem os pontos atuais; a sua ` +
+          'ausência significa que a folha mudou de formato.',
+      },
+    ]);
+  }
+  if (idIndex === RATING_COLUMN || nameIndex === RATING_COLUMN) {
+    fail('A coluna C da folha de ranking não tem pontos.', [
+      {
+        path: 'csv',
+        message:
+          `Cabeçalho encontrado: ${header.join(', ')}. A coluna C é a de "${ratingHeader}", ` +
+          'não a dos pontos atuais. A importação foi abortada.',
       },
     ]);
   }
@@ -200,6 +212,8 @@ export function parseRankingCsv(csv: string): ParsedRankings {
   const snapshots: ParsedSnapshot[] = [];
   const seenMatchKeys = new Map<string, ExternalPlayerId[]>();
   let skippedRows = 0;
+  let filledCells = 0;
+  let badCells = 0;
 
   for (const line of dataLines) {
     const cells = splitLine(line, delimiter);
@@ -232,15 +246,31 @@ export function parseRankingCsv(csv: string): ParsedRankings {
       matchKey,
     });
 
-    for (const column of dateColumns) {
-      const raw = cells[column.index] ?? '';
-      if (raw.length === 0) continue;
-      // Some exports use a comma as the decimal separator; points are integers, so a stray comma
-      // means the cell is not a plain number and is dropped rather than reinterpreted.
-      const points = Number(raw);
-      if (!Number.isFinite(points) || !Number.isInteger(points) || points < 0) continue;
-      snapshots.push({ matchKey, ratedOn: column.ratedOn, points });
+    const raw = cells[RATING_COLUMN] ?? '';
+    // A blank means "not rated", which is not zero points.
+    if (raw.length === 0) continue;
+    filledCells += 1;
+    // Some exports use a comma as the decimal separator; points are integers, so a stray comma
+    // means the cell is not a plain number and is dropped rather than reinterpreted.
+    const points = Number(raw);
+    if (!Number.isFinite(points) || !Number.isInteger(points) || points < 0) {
+      badCells += 1;
+      continue;
     }
+    snapshots.push({ matchKey, points });
+  }
+
+  // One bad cell is a typo; more than one in ten means column C is not points any more (FR-027).
+  // Integer arithmetic, so the threshold is exact rather than subject to rounding.
+  if (badCells * 10 > filledCells) {
+    fail('A coluna C da folha de ranking não parece ter pontos.', [
+      {
+        path: 'csv',
+        message:
+          `${badCells} de ${filledCells} células da coluna "${ratingHeader}" não são pontos ` +
+          'válidos (mais de uma em dez). A importação foi abortada.',
+      },
+    ]);
   }
 
   // Identity collisions abort the import. This is the whole point of ADR-007: a duplicate name means
@@ -263,17 +293,12 @@ export function parseRankingCsv(csv: string): ParsedRankings {
     );
   }
 
-  const latestRatedOn =
-    dateColumns
-      .map((column) => column.ratedOn)
-      .sort()
-      .at(-1) ?? null;
-
   return {
     players,
     snapshots,
     rowsRead: players.length,
     skippedRows,
-    latestRatedOn,
+    ratingHeader,
+    headerRatedOn: parseSheetDateHeader(ratingHeader),
   };
 }

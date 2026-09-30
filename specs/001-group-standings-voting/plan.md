@@ -113,6 +113,26 @@ becomes caller-controlled (Risk R2). And the pooler is now mandatory for a secon
 reason: Supabase's direct endpoint is IPv6-only and CI runners are IPv4-only (Risk R8). See
 [ADR-010](../../docs/adr/ADR-010-hosting-vercel-supabase.md) § Amendment.
 
+**Amendment 2026-09-30 (ranking import, per Principle I)**: the sync reads the sheet's column C as
+each player's current points and ignores every later column (FR-027). Its date is the column's
+header unless that header is unparseable, in the future, or earlier than the newest stored date, in
+which case it is the sync day in `Europe/Lisbon`. The trigger was the sheet as observed on
+2026-09-28 (research F1 § Amendment): month-first headers for days 1–12 that a day-first parser
+reads as a different, sometimes future, date without complaint.
+
+Principle II holds: the column guards stay in `packages/core/src/rankings/parse.ts`, and the date
+rule and the Lisbon calendar day are a new pure module beside it, using `Intl` only. The handler
+supplies `clock.now()` and `ratings.latestRatedOn()`, both existing ports, so no port changes and no
+repository reads the clock. Principle III holds: `ratedOn` and `ratedOnBasis` are *added* to the
+sync response, which breaks no existing field and needs no new version prefix; the contract changes
+before the handler does. Principle V holds: no dependency, no migration, no new service. Coverage:
+`packages/core/src/rankings/**` joins the 100% branch gate, for the reason feature 002 gave for
+`lineup-extraction` — a wrong date there puts wrong points on a public page looking correct.
+
+One consequence is operational rather than code: a production database already holding a
+future-dated row from the old parser would outrank every later sync. That is a one-off, handled by
+a runbook step before the first sync rather than by a permanent guard (T137).
+
 **Post-design re-check (after Phase 1)**: PASS. Two items were reviewed and consciously kept:
 `packages/client` is generated rather than hand-written (Principle III requires it), and aggregation
 is split between a SQL view (counting) and a pure TypeScript function (percentages, ordering,
