@@ -48,6 +48,11 @@ export const en: Messages = {
     votingClosed: 'Voting closed',
     startsAt: 'Start',
     groupsHeading: 'Groups',
+    invalidatedBadge: 'Invalidated',
+    invalidatedNotice: 'This lineup was corrected and replaced.',
+    replacedByLink: (name: string) => `See the current tournament: ${name}`,
+    resultsWithheld:
+      'The prediction for this lineup becomes available when voting closes on the tournament that replaced it.',
   },
 
   ballot: {
@@ -147,6 +152,20 @@ export const en: Messages = {
     flagTOTAL_MISMATCH:
       'The total does not match the sum of the two players. Check which is right.',
     warningNO_ROWS_FOUND: 'No lineup table was found in the image.',
+    modeLabel: 'What do you want to do?',
+    modePublish: 'Publish a new tournament',
+    modeReplace: 'Replace a tournament with voting open',
+    replaceTarget: 'Tournament to replace',
+    replaceChoose: 'Choose tournament',
+    replaceNoneOpen: 'No tournament has voting open.',
+    replaceHint:
+      'Paste or import the full corrected lineup. Groups with the same letter and the same pairs keep their votes; the rest restart voting.',
+    replacePreviewHeading: (name: string) => `Replaces: ${name}`,
+    keepsVotes: (count: number) => (count === 1 ? 'Keeps 1 vote' : `Keeps ${count} votes`),
+    votingRestarts: 'Voting restarts',
+    replace: 'Replace tournament',
+    replacing: 'Replacing…',
+    replaced: 'Tournament replaced. The previous one is now marked invalidated.',
     warningODD_ROW_COUNT:
       'An odd number of pairs was read. Check whether a row is missing or extra.',
   },
@@ -164,6 +183,8 @@ export const en: Messages = {
     INVALID_GROUP_SIZE: 'A group must have between 3 and 6 pairs.',
     SLUG_TAKEN: 'A tournament with this address already exists.',
     NOT_CONFIRMED: 'Publishing must be confirmed.',
+    NOT_REPLACEABLE:
+      'This tournament can no longer be replaced: voting closed or it was already replaced.',
     DUPLICATE_MATCH_KEY: 'Two ranking-list players share the same name. Resolve it manually.',
     INCOMPLETE_BALLOT: 'Every position still needs to be assigned.',
     DUPLICATE_POSITION: 'Each position can be used only once.',

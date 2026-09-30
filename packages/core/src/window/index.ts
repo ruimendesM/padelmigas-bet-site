@@ -18,10 +18,13 @@ import type { Clock } from '../ports/index.js';
  *
  *  - `draft`  — not published; invisible to the public regardless of the clock.
  *  - `open`   — published, and now is strictly before `startsAt`.
- *  - `closed` — published, and now is at or after `startsAt`.
+ *  - `closed` — published, and now is at or after `startsAt`; or published and invalidated by a
+ *    replacement, whatever the clock says (feature 003, FR-211). Invalidated is reported as closed
+ *    rather than as a status of its own so the wire enum stays `open | closed` (research R2).
  */
 export function tournamentStatusAt(tournament: Tournament, now: Date): TournamentStatus {
   if (tournament.publishedAt === null) return 'draft';
+  if (tournament.invalidatedAt !== null) return 'closed';
   // Strictly before: at the start instant the window is already shut. The tournament is beginning,
   // and a ballot cast on the first point is not a prediction (FR-011).
   return now.getTime() < tournament.startsAt.getTime() ? 'open' : 'closed';

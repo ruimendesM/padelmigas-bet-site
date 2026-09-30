@@ -50,7 +50,7 @@ export function createGroupRepository(sql: Sql): GroupRepository {
 
     async findTournamentForGroup(id) {
       const rows = await sql<Row[]>`
-        select t.id, t.name, t.slug, t.starts_at, t.published_at
+        select t.id, t.name, t.slug, t.starts_at, t.published_at, t.invalidated_at, t.replaced_by_id
         from groups g
         join tournaments t on t.id = g.tournament_id
         where g.id = ${id}

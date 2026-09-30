@@ -57,6 +57,15 @@ paths:
           schema:
             type: string
             minLength: 1
+        - name: includeInvalidated
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
       responses:
         "200":
           description: List published tournaments
@@ -91,6 +100,30 @@ paths:
                         ballotCount:
                           type: integer
                           minimum: 0
+                        invalidation:
+                          type: object
+                          properties:
+                            invalidatedAt:
+                              type: string
+                              format: date-time
+                            replacedBy:
+                              type: object
+                              properties:
+                                slug:
+                                  type: string
+                                name:
+                                  type: string
+                              required:
+                                - slug
+                                - name
+                              additionalProperties: false
+                            resultsWithheld:
+                              type: boolean
+                          required:
+                            - invalidatedAt
+                            - replacedBy
+                            - resultsWithheld
+                          additionalProperties: false
                       required:
                         - id
                         - slug
@@ -162,6 +195,30 @@ paths:
                   ballotCount:
                     type: integer
                     minimum: 0
+                  invalidation:
+                    type: object
+                    properties:
+                      invalidatedAt:
+                        type: string
+                        format: date-time
+                      replacedBy:
+                        type: object
+                        properties:
+                          slug:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                          - slug
+                          - name
+                        additionalProperties: false
+                      resultsWithheld:
+                        type: boolean
+                    required:
+                      - invalidatedAt
+                      - replacedBy
+                      - resultsWithheld
+                    additionalProperties: false
                   groups:
                     type: array
                     items:
@@ -681,6 +738,30 @@ paths:
                             ballotCount:
                               type: integer
                               minimum: 0
+                            invalidation:
+                              type: object
+                              properties:
+                                invalidatedAt:
+                                  type: string
+                                  format: date-time
+                                replacedBy:
+                                  type: object
+                                  properties:
+                                    slug:
+                                      type: string
+                                    name:
+                                      type: string
+                                  required:
+                                    - slug
+                                    - name
+                                  additionalProperties: false
+                                resultsWithheld:
+                                  type: boolean
+                              required:
+                                - invalidatedAt
+                                - replacedBy
+                                - resultsWithheld
+                              additionalProperties: false
                           required:
                             - id
                             - slug
@@ -1125,6 +1206,30 @@ paths:
                   ballotCount:
                     type: integer
                     minimum: 0
+                  invalidation:
+                    type: object
+                    properties:
+                      invalidatedAt:
+                        type: string
+                        format: date-time
+                      replacedBy:
+                        type: object
+                        properties:
+                          slug:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                          - slug
+                          - name
+                        additionalProperties: false
+                      resultsWithheld:
+                        type: boolean
+                    required:
+                      - invalidatedAt
+                      - replacedBy
+                      - resultsWithheld
+                    additionalProperties: false
                   groups:
                     type: array
                     items:
@@ -1401,6 +1506,612 @@ paths:
               additionalProperties: false
       security:
         - organiserSession: []
+  /admin/tournaments/{slug}/replace/preview:
+    post:
+      operationId: previewReplacement
+      tags:
+        - admin
+      summary: Validate a corrected lineup for an open tournament and show which groups keep their votes
+      description: "Requirements: FR-201, FR-202, FR-203, FR-206."
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validate a corrected lineup for an open tournament and show which groups keep their votes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  slug:
+                    type: string
+                  startsAt:
+                    type: string
+                    format: date-time
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:
+                          type: string
+                        pairs:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              seed:
+                                type: integer
+                                minimum: 1
+                              club:
+                                type: string
+                              totalPoints:
+                                type: integer
+                                minimum: 0
+                              players:
+                                type: array
+                                minItems: 2
+                                maxItems: 2
+                                items:
+                                  - type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                      points:
+                                        type: integer
+                                        minimum: 0
+                                    required:
+                                      - id
+                                      - name
+                                      - points
+                                    additionalProperties: false
+                                  - type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                      points:
+                                        type: integer
+                                        minimum: 0
+                                    required:
+                                      - id
+                                      - name
+                                      - points
+                                    additionalProperties: false
+                            required:
+                              - id
+                              - seed
+                              - club
+                              - totalPoints
+                              - players
+                            additionalProperties: false
+                          minItems: 3
+                          maxItems: 6
+                        carryOver:
+                          type: object
+                          properties:
+                            keepsVotes:
+                              type: boolean
+                            ballotCount:
+                              type: integer
+                              minimum: 0
+                          required:
+                            - keepsVotes
+                            - ballotCount
+                          additionalProperties: false
+                      required:
+                        - label
+                        - pairs
+                        - carryOver
+                      additionalProperties: false
+                  resolvedPlayers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        inputName:
+                          type: string
+                        externalId:
+                          type: integer
+                          exclusiveMinimum: true
+                          minimum: 0
+                          nullable: true
+                        displayName:
+                          type: string
+                        isNew:
+                          type: boolean
+                      required:
+                        - inputName
+                        - externalId
+                        - displayName
+                        - isNew
+                      additionalProperties: false
+                  replaces:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      slug:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                      - id
+                      - slug
+                      - name
+                    additionalProperties: false
+                required:
+                  - name
+                  - slug
+                  - startsAt
+                  - groups
+                  - resolvedPlayers
+                  - replaces
+                additionalProperties: false
+        "400":
+          description: "`UNRESOLVED_PLAYERS` | `MALFORMED_PAYLOAD` | `START_NOT_IN_FUTURE` |
+            `DUPLICATE_PLAYER` | `POINTS_MISMATCH` | `INVALID_GROUP_SIZE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "404":
+          description: "`NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "409":
+          description: "`NOT_REPLACEABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                slug:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                  pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+                startsAt:
+                  type: string
+                  format: date-time
+                pairs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      club:
+                        type: string
+                        minLength: 1
+                      totalPoints:
+                        type: integer
+                        minimum: 0
+                      group:
+                        type: string
+                        minLength: 1
+                      players:
+                        type: array
+                        minItems: 2
+                        maxItems: 2
+                        items:
+                          - type: object
+                            properties:
+                              name:
+                                type: string
+                                minLength: 1
+                              points:
+                                type: integer
+                                minimum: 0
+                            required:
+                              - name
+                              - points
+                            additionalProperties: false
+                          - type: object
+                            properties:
+                              name:
+                                type: string
+                                minLength: 1
+                              points:
+                                type: integer
+                                minimum: 0
+                            required:
+                              - name
+                              - points
+                            additionalProperties: false
+                    required:
+                      - club
+                      - totalPoints
+                      - players
+                    additionalProperties: false
+                  minItems: 3
+              required:
+                - name
+                - startsAt
+                - pairs
+              additionalProperties: false
+      security:
+        - organiserSession: []
+  /admin/tournaments/{slug}/replace:
+    post:
+      operationId: replaceTournament
+      tags:
+        - admin
+      summary: Invalidate an open tournament and publish its corrected lineup at the same address,
+        carrying over unchanged groups
+      description: "Requirements: FR-204, FR-205, FR-207, FR-208, FR-209, FR-210."
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Invalidate an open tournament and publish its corrected lineup at the same address,
+            carrying over unchanged groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  slug:
+                    type: string
+                  name:
+                    type: string
+                  startsAt:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+                    enum:
+                      - open
+                      - closed
+                  groupCount:
+                    type: integer
+                    minimum: 0
+                  ballotCount:
+                    type: integer
+                    minimum: 0
+                  invalidation:
+                    type: object
+                    properties:
+                      invalidatedAt:
+                        type: string
+                        format: date-time
+                      replacedBy:
+                        type: object
+                        properties:
+                          slug:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                          - slug
+                          - name
+                        additionalProperties: false
+                      resultsWithheld:
+                        type: boolean
+                    required:
+                      - invalidatedAt
+                      - replacedBy
+                      - resultsWithheld
+                    additionalProperties: false
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        label:
+                          type: string
+                        position:
+                          type: integer
+                          minimum: 1
+                        pairs:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              seed:
+                                type: integer
+                                minimum: 1
+                              club:
+                                type: string
+                              totalPoints:
+                                type: integer
+                                minimum: 0
+                              players:
+                                type: array
+                                minItems: 2
+                                maxItems: 2
+                                items:
+                                  - type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                      points:
+                                        type: integer
+                                        minimum: 0
+                                    required:
+                                      - id
+                                      - name
+                                      - points
+                                    additionalProperties: false
+                                  - type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                      points:
+                                        type: integer
+                                        minimum: 0
+                                    required:
+                                      - id
+                                      - name
+                                      - points
+                                    additionalProperties: false
+                            required:
+                              - id
+                              - seed
+                              - club
+                              - totalPoints
+                              - players
+                            additionalProperties: false
+                          minItems: 3
+                          maxItems: 6
+                        hasVoted:
+                          type: boolean
+                        votingOpen:
+                          type: boolean
+                        ownBallot:
+                          type: object
+                          properties:
+                            castAt:
+                              type: string
+                              format: date-time
+                            ordering:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  pairId:
+                                    type: string
+                                    format: uuid
+                                  position:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 6
+                                required:
+                                  - pairId
+                                  - position
+                                additionalProperties: false
+                          required:
+                            - castAt
+                            - ordering
+                          additionalProperties: false
+                          nullable: true
+                        results:
+                          type: object
+                          properties:
+                            groupId:
+                              type: string
+                              format: uuid
+                            ballotCount:
+                              type: integer
+                              minimum: 1
+                            standings:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  pairId:
+                                    type: string
+                                    format: uuid
+                                  predictedPosition:
+                                    type: integer
+                                    minimum: 1
+                                  meanPosition:
+                                    type: number
+                                    minimum: 1
+                                  positionShares:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        position:
+                                          type: integer
+                                          minimum: 1
+                                          maximum: 6
+                                        votes:
+                                          type: integer
+                                          minimum: 0
+                                        share:
+                                          type: number
+                                          minimum: 0
+                                          maximum: 1
+                                      required:
+                                        - position
+                                        - votes
+                                        - share
+                                      additionalProperties: false
+                                required:
+                                  - pairId
+                                  - predictedPosition
+                                  - meanPosition
+                                  - positionShares
+                                additionalProperties: false
+                          required:
+                            - groupId
+                            - ballotCount
+                            - standings
+                          additionalProperties: false
+                          nullable: true
+                      required:
+                        - id
+                        - label
+                        - position
+                        - pairs
+                        - hasVoted
+                        - votingOpen
+                      additionalProperties: false
+                required:
+                  - id
+                  - slug
+                  - name
+                  - startsAt
+                  - status
+                  - groupCount
+                  - ballotCount
+                  - groups
+                additionalProperties: false
+        "400":
+          description: "`UNRESOLVED_PLAYERS` | `MALFORMED_PAYLOAD` | `START_NOT_IN_FUTURE` |
+            `DUPLICATE_PLAYER` | `POINTS_MISMATCH` | `INVALID_GROUP_SIZE` | `NOT_CONFIRMED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "404":
+          description: "`NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "409":
+          description: "`NOT_REPLACEABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                slug:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                  pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+                startsAt:
+                  type: string
+                  format: date-time
+                pairs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      club:
+                        type: string
+                        minLength: 1
+                      totalPoints:
+                        type: integer
+                        minimum: 0
+                      group:
+                        type: string
+                        minLength: 1
+                      players:
+                        type: array
+                        minItems: 2
+                        maxItems: 2
+                        items:
+                          - type: object
+                            properties:
+                              name:
+                                type: string
+                                minLength: 1
+                              points:
+                                type: integer
+                                minimum: 0
+                            required:
+                              - name
+                              - points
+                            additionalProperties: false
+                          - type: object
+                            properties:
+                              name:
+                                type: string
+                                minLength: 1
+                              points:
+                                type: integer
+                                minimum: 0
+                            required:
+                              - name
+                              - points
+                            additionalProperties: false
+                    required:
+                      - club
+                      - totalPoints
+                      - players
+                    additionalProperties: false
+                  minItems: 3
+                confirm:
+                  type: boolean
+                  enum:
+                    - true
+              required:
+                - name
+                - startsAt
+                - pairs
+                - confirm
+              additionalProperties: false
+      security:
+        - organiserSession: []
   /admin/rankings/sync:
     post:
       operationId: syncRankings
@@ -1505,6 +2216,7 @@ components:
             - INVALID_GROUP_SIZE
             - SLUG_TAKEN
             - NOT_CONFIRMED
+            - NOT_REPLACEABLE
             - DUPLICATE_MATCH_KEY
             - PAYLOAD_TOO_LARGE
             - EXTRACTION_UNAVAILABLE
@@ -1540,6 +2252,7 @@ components:
             - INVALID_GROUP_SIZE
             - SLUG_TAKEN
             - NOT_CONFIRMED
+            - NOT_REPLACEABLE
             - DUPLICATE_MATCH_KEY
             - PAYLOAD_TOO_LARGE
             - EXTRACTION_UNAVAILABLE

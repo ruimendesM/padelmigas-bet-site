@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { LineupExtractionDto, LineupPreviewDto } from '@padelmigas/contracts';
+import type {
+  LineupExtractionDto,
+  LineupPreviewDto,
+  ReplacementPreviewDto,
+  TournamentSummaryDto,
+} from '@padelmigas/contracts';
 import { ApiRequestError, type C } from '@padelmigas/client';
 import {
   createLineupDraft,
@@ -50,7 +55,17 @@ export default function AdminPage() {
    */
   const [draft, setDraft] = useState<LineupDraft | null>(null);
   const [warnings, setWarnings] = useState<LineupExtractionDto['warnings']>([]);
-  const [preview, setPreview] = useState<LineupPreviewDto | null>(null);
+  const [preview, setPreview] = useState<LineupPreviewDto | ReplacementPreviewDto | null>(null);
+  /**
+   * Publish a new tournament, or replace an open one with a corrected lineup (feature 003).
+   *
+   * Both run the same draft → preview → confirm flow on the same payload; only the endpoints and
+   * the preview's per-group carry-over marks differ. Switching mode or target retracts the preview,
+   * for the same reason an edit does.
+   */
+  const [mode, setMode] = useState<'publish' | 'replace'>('publish');
+  const [openTournaments, setOpenTournaments] = useState<TournamentSummaryDto[]>([]);
+  const [target, setTarget] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'none' | 'preview' | 'publish' | 'sync' | 'signin'>('none');
@@ -113,6 +128,32 @@ export default function AdminPage() {
     setPayload(isLineupDraftComplete(next) ? JSON.stringify(toLineupPayload(next), null, 2) : '');
   }
 
+  function retractPreview(): void {
+    setPreview(null);
+    setIssues([]);
+    setError(null);
+  }
+
+  /** Only tournaments still open for voting can be replaced (FR-201). */
+  async function loadOpenTournaments(): Promise<void> {
+    try {
+      const page = await api.listTournaments({ query: { status: 'open', limit: 50 } });
+      setOpenTournaments(page.tournaments);
+      setTarget((current) =>
+        page.tournaments.some((tournament) => tournament.slug === current) ? current : '',
+      );
+    } catch (failure) {
+      fail(failure);
+    }
+  }
+
+  function chooseMode(next: 'publish' | 'replace'): void {
+    setMode(next);
+    retractPreview();
+    setNotice(null);
+    if (next === 'replace') void loadOpenTournaments();
+  }
+
   function parsePayload(): unknown | null {
     try {
       return JSON.parse(payload);
@@ -152,7 +193,14 @@ export default function AdminPage() {
     setError(null);
     setIssues([]);
     try {
-      setPreview(await api.previewLineup({ body: parsed as C.PreviewLineupBody }));
+      setPreview(
+        mode === 'replace'
+          ? await api.previewReplacement({
+              slug: target,
+              body: parsed as C.PreviewReplacementBody,
+            })
+          : await api.previewLineup({ body: parsed as C.PreviewLineupBody }),
+      );
     } catch (failure) {
       setPreview(null);
       fail(failure);
@@ -168,12 +216,18 @@ export default function AdminPage() {
     setBusy('publish');
     setError(null);
     try {
-      await api.publishTournament({
-        // `confirm` is added here, at the click, and is never part of the pasted payload: the
-        // confirmation has to come from the organiser's action, not from what they pasted (FR-002).
-        body: { ...(parsed as object), confirm: true } as C.PublishTournamentBody,
-      });
-      setNotice(t.admin.published);
+      // `confirm` is added here, at the click, and is never part of the pasted payload: the
+      // confirmation has to come from the organiser's action, not from what they pasted (FR-002).
+      const body = { ...(parsed as object), confirm: true };
+      if (mode === 'replace') {
+        await api.replaceTournament({ slug: target, body: body as C.ReplaceTournamentBody });
+        setNotice(t.admin.replaced);
+        setTarget('');
+        void loadOpenTournaments();
+      } else {
+        await api.publishTournament({ body: body as C.PublishTournamentBody });
+        setNotice(t.admin.published);
+      }
       setPreview(null);
       setPayload('');
       setDraft(null);
@@ -280,6 +334,55 @@ export default function AdminPage() {
         </p>
       ) : null}
 
+      <fieldset className="mt-6">
+        <legend className="text-sm font-semibold">{t.admin.modeLabel}</legend>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm">
+          {(['publish', 'replace'] as const).map((option) => (
+            <label key={option} className="flex min-h-11 items-center gap-2">
+              <input
+                type="radio"
+                name="admin-mode"
+                value={option}
+                checked={mode === option}
+                onChange={() => chooseMode(option)}
+                disabled={busy !== 'none'}
+              />
+              {option === 'publish' ? t.admin.modePublish : t.admin.modeReplace}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {mode === 'replace' ? (
+        <div className="mt-3">
+          <label className="block text-sm" htmlFor="replace-target">
+            {t.admin.replaceTarget}
+          </label>
+          {openTournaments.length === 0 ? (
+            <p className="text-ink-muted mt-1 text-xs">{t.admin.replaceNoneOpen}</p>
+          ) : (
+            <select
+              id="replace-target"
+              value={target}
+              onChange={(event) => {
+                setTarget(event.target.value);
+                retractPreview();
+              }}
+              disabled={busy !== 'none'}
+              className="bg-surface border-border mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+            >
+              <option value="">{t.admin.replaceChoose}</option>
+              {openTournaments.map((tournament) => (
+                <option key={tournament.id} value={tournament.slug}>
+                  {tournament.name} · {formatStartsAt(tournament.startsAt)}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-ink-muted mt-1 text-xs">{t.admin.replaceHint}</p>
+        </div>
+      ) : null}
+
       <LineupUpload onExtracted={acceptExtraction} onFailure={fail} disabled={busy !== 'none'} />
 
       {/* Row-set problems, reported apart from per-cell marks: every row can look fine and the set
@@ -376,7 +479,9 @@ export default function AdminPage() {
         <button
           type="button"
           onClick={() => void runPreview()}
-          disabled={busy !== 'none' || payload.trim().length === 0}
+          disabled={
+            busy !== 'none' || payload.trim().length === 0 || (mode === 'replace' && target === '')
+          }
           className="border-accent text-accent min-h-11 rounded-md border px-4 text-sm font-semibold disabled:opacity-50"
         >
           {busy === 'preview' ? t.admin.previewing : t.admin.preview}
@@ -389,7 +494,13 @@ export default function AdminPage() {
             disabled={busy !== 'none'}
             className="bg-accent text-accent-ink min-h-11 rounded-md px-4 text-sm font-semibold disabled:opacity-50"
           >
-            {busy === 'publish' ? t.admin.publishing : t.admin.publish}
+            {mode === 'replace'
+              ? busy === 'publish'
+                ? t.admin.replacing
+                : t.admin.replace
+              : busy === 'publish'
+                ? t.admin.publishing
+                : t.admin.publish}
           </button>
         ) : null}
       </div>
@@ -400,12 +511,32 @@ export default function AdminPage() {
           <p className="text-ink-muted mt-1 text-sm">
             /torneios/{preview.slug} · {formatStartsAt(preview.startsAt)}
           </p>
+          {'replaces' in preview ? (
+            <p className="text-ink-muted mt-1 text-xs">
+              {t.admin.replacePreviewHeading(preview.replaces.name)}
+            </p>
+          ) : null}
 
           <div className="mt-4 space-y-5">
             {preview.groups.map((group) => (
               <section key={group.label} aria-label={`${t.common.group} ${group.label}`}>
                 <h3 className="text-sm font-semibold">
                   {t.common.group} {group.label}
+                  {'carryOver' in group ? (
+                    // Which groups keep their votes is the decision the organiser is confirming
+                    // (FR-203), so it sits on the group heading rather than in a footnote.
+                    <span
+                      className={
+                        group.carryOver.keepsVotes
+                          ? 'text-accent ml-2 text-xs font-normal'
+                          : 'text-danger ml-2 text-xs font-normal'
+                      }
+                    >
+                      {group.carryOver.keepsVotes
+                        ? t.admin.keepsVotes(group.carryOver.ballotCount)
+                        : t.admin.votingRestarts}
+                    </span>
+                  ) : null}
                 </h3>
                 <ol className="mt-1 space-y-1">
                   {group.pairs.map((pair) => (

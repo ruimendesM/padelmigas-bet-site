@@ -6,12 +6,14 @@ import { str, toBallot, toBallotEntry, toVoter, type Row } from './mappers.js';
 /**
  * Voters and ballots — the write path the whole product turns on.
  *
- * Three properties are enforced here rather than hoped for:
+ * Four properties are enforced here rather than hoped for:
  *  - **One transaction per ballot** (FR-010): the ballot row and every entry land together, so a
  *    rejected ballot leaves nothing behind and no group is ever scored from a partial ordering.
  *  - **A duplicate is an outcome, not a crash** (Risk R7, SC-009): the `UNIQUE (group_id, voter_id)`
  *    violation is caught and returned as `already-voted`, so two simultaneous submissions produce
  *    exactly one ballot and a 409 rather than a 500.
+ *  - **No ballot is lost to a replacement** (feature 003, research R4): the insert shares a lock
+ *    with the tournament row and re-checks the window under it.
  *  - **`touch` never fails the request** (ADR-004): refreshing `last_seen_at` is bookkeeping; losing
  *    it must not cost a voter their vote.
  */
@@ -68,6 +70,21 @@ export function createBallotRepository(sql: Sql): BallotRepository {
     async insert(ballot) {
       try {
         return await sql.begin<BallotInsertOutcome>(async (tx) => {
+          // FOR SHARE on the tournament row: concurrent voters share it, a replacement's FOR UPDATE
+          // excludes it (feature 003, research R4). Without it a ballot checked before a
+          // replacement but committed after its copy would land on the invalidated group only while
+          // being reported as recorded. Re-checking the window under the lock closes that gap.
+          const open = await tx<Row[]>`
+            select t.id
+            from groups g
+            join tournaments t on t.id = g.tournament_id
+            where g.id = ${ballot.groupId}
+              and t.invalidated_at is null
+              and t.starts_at > ${ballot.now}
+            for share of t
+          `;
+          if (open.length === 0) return { kind: 'closed' };
+
           const ballotRows = await tx<Row[]>`
             insert into ballots (group_id, voter_id)
             values (${ballot.groupId}, ${ballot.voterId})

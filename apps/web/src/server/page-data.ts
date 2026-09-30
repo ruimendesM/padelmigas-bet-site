@@ -34,10 +34,16 @@ export async function caller(): Promise<CallerContext> {
 }
 
 export async function fetchTournaments(
-  query: { status?: 'open' | 'closed' | 'all'; limit?: number } = {},
+  query: { status?: 'open' | 'closed' | 'all'; limit?: number; includeInvalidated?: boolean } = {},
 ): Promise<TournamentListResponse> {
   return listTournaments(
-    { status: query.status ?? 'all', limit: query.limit ?? 20, cursor: undefined },
+    {
+      status: query.status ?? 'all',
+      limit: query.limit ?? 20,
+      cursor: undefined,
+      // Off unless asked for: only history lists replaced tournaments (feature 003, FR-211).
+      includeInvalidated: query.includeInvalidated ?? false,
+    },
     getDeps(),
   );
 }

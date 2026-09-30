@@ -1,4 +1,4 @@
-import type { TournamentListPage, TournamentListQuery } from '@padelmigas/core';
+import type { Tournament, TournamentListPage, TournamentListQuery } from '@padelmigas/core';
 import type { Sql } from './client.js';
 import { num, toTournament, type Row } from './mappers.js';
 
@@ -39,6 +39,20 @@ export function decodeCursor(raw: string): Cursor | null {
   }
 }
 
+/** The joined `r_*` columns as the direct replacement, or `null` for a live tournament. */
+function replacedByFrom(row: Row): Tournament | null {
+  if (row['r_id'] === null || row['r_id'] === undefined) return null;
+  return toTournament({
+    id: row['r_id'],
+    name: row['r_name'],
+    slug: row['r_slug'],
+    starts_at: row['r_starts_at'],
+    published_at: row['r_published_at'],
+    invalidated_at: row['r_invalidated_at'],
+    replaced_by_id: row['r_replaced_by_id'],
+  });
+}
+
 export async function listPublished(
   sql: Sql,
   query: TournamentListQuery,
@@ -52,9 +66,19 @@ export async function listPublished(
            t.slug,
            t.starts_at,
            t.published_at,
+           t.invalidated_at,
+           t.replaced_by_id,
            coalesce(g.group_count, 0)  as group_count,
-           coalesce(b.ballot_count, 0) as ballot_count
+           coalesce(b.ballot_count, 0) as ballot_count,
+           r.id             as r_id,
+           r.name           as r_name,
+           r.slug           as r_slug,
+           r.starts_at      as r_starts_at,
+           r.published_at   as r_published_at,
+           r.invalidated_at as r_invalidated_at,
+           r.replaced_by_id as r_replaced_by_id
     from tournaments t
+    left join tournaments r on r.id = t.replaced_by_id
     left join (
       select tournament_id, count(*)::int as group_count
       from groups
@@ -67,11 +91,13 @@ export async function listPublished(
       group by gr.tournament_id
     ) b on b.tournament_id = t.id
     where t.published_at is not null
+      -- Invalidated counts as closed, matching core/window (feature 003, research R2).
       and case ${query.status}
-            when 'open'   then t.starts_at >  ${query.now}
-            when 'closed' then t.starts_at <= ${query.now}
+            when 'open'   then t.starts_at >  ${query.now} and t.invalidated_at is null
+            when 'closed' then t.starts_at <= ${query.now} or t.invalidated_at is not null
             else true
           end
+      and (${query.includeInvalidated} or t.invalidated_at is null)
       and (
         ${cursor === null}
         or (t.published_at, t.id) < (${cursor?.publishedAt ?? null}::timestamptz, ${cursor?.id ?? null}::uuid)
@@ -88,6 +114,7 @@ export async function listPublished(
     tournament: toTournament(row),
     groupCount: num(row, 'group_count'),
     ballotCount: num(row, 'ballot_count'),
+    replacedBy: replacedByFrom(row),
   }));
 
   const last = page.at(-1);

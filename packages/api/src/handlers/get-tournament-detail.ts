@@ -2,6 +2,7 @@ import type { TournamentDetailDto } from '@padelmigas/contracts';
 import type { GroupId } from '@padelmigas/contracts/common';
 import { domainError, isRevealed, isVotingOpen, scoreGroup } from '@padelmigas/core';
 import type { Deps, VoterScoped } from '../handler.js';
+import { loadInvalidationContext } from '../invalidation.js';
 import { toGroupDto, toTournamentSummaryDto } from '../views.js';
 
 /**
@@ -36,6 +37,9 @@ export async function getTournamentDetail(
 
   const now = deps.clock.now();
   const votingOpen = isVotingOpen(tournament, now);
+  // Only an invalidated tournament has a chain to follow (feature 003, FR-212, FR-213).
+  const replacement = await loadInvalidationContext(tournament, deps);
+  const liveSuccessor = replacement?.liveSuccessor ?? null;
   const groupIds = tournament.groups.map((group) => group.id);
 
   const votedGroupIds: ReadonlySet<GroupId> = input.caller.voterId
@@ -53,7 +57,7 @@ export async function getTournamentDetail(
       const ownBallot = hasVoted && voterId ? await deps.ballots.findOwn(group.id, voterId) : null;
 
       const counts = countsByGroup.get(group.id);
-      const revealed = isRevealed({ tournament, hasVoted, now });
+      const revealed = isRevealed({ tournament, hasVoted, now, liveSuccessor });
       const results =
         revealed && counts
           ? scoreGroup({
@@ -80,6 +84,7 @@ export async function getTournamentDetail(
       groupCount: tournament.groups.length,
       ballotCount,
       now,
+      ...(replacement ? { replacement } : {}),
     }),
     groups,
   };

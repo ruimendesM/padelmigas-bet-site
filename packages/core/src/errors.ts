@@ -63,6 +63,10 @@ export const HTTP_STATUS_BY_CODE: Readonly<Record<ErrorCode, number>> = {
   SLUG_TAKEN: 409,
   NOT_CONFIRMED: 400,
 
+  // Replacing a tournament: voting on the target has closed or it was already replaced. A conflict
+  // with current state, like SLUG_TAKEN (FR-205).
+  NOT_REPLACEABLE: 409,
+
   // Ranking import
   DUPLICATE_MATCH_KEY: 409,
 

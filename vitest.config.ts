@@ -22,6 +22,9 @@ export default defineConfig({
         // Added for the 2026-09-30 amendment (FR-027): a wrong column or a wrong date here puts wrong
         // current points on every player page and lineup preview, looking correct.
         'packages/core/src/rankings/**/*.ts',
+        // Added for feature 003: a group wrongly judged unchanged carries votes for pairs that will
+        // not play; one wrongly judged changed silently discards every vote on it.
+        'packages/core/src/replacement/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/index.ts.map'],
       thresholds: {

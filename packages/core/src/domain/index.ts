@@ -55,6 +55,13 @@ export interface Tournament {
   readonly startsAt: Date;
   /** `null` means draft: never publicly visible. */
   readonly publishedAt: Date | null;
+  /**
+   * Set when the tournament was replaced by a corrected lineup (feature 003, FR-204). An invalidated
+   * tournament is closed to voting whatever the clock says; `core/window` decides that.
+   */
+  readonly invalidatedAt: Date | null;
+  /** The direct replacement; non-null exactly when `invalidatedAt` is. */
+  readonly replacedById: TournamentId | null;
 }
 
 export interface Group {

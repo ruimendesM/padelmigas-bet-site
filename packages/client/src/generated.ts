@@ -5,7 +5,7 @@
 // packages/contracts/src/endpoints.ts; editing this file by hand is overwritten on the next run and
 // silently breaks the guarantee that every client speaks the same contract (Principle III).
 //
-// Generated 9 operations.
+// Generated 11 operations.
 
 import type { z } from 'zod';
 import * as contracts from '@padelmigas/contracts';
@@ -25,7 +25,11 @@ export namespace C {
   export type ExtractLineupBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[6]['body']>>;
   export type PublishTournamentResponse = z.output<(typeof contracts.ENDPOINTS)[7]['response']>;
   export type PublishTournamentBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[7]['body']>>;
-  export type SyncRankingsResponse = z.output<(typeof contracts.ENDPOINTS)[8]['response']>;
+  export type PreviewReplacementResponse = z.output<(typeof contracts.ENDPOINTS)[8]['response']>;
+  export type PreviewReplacementBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[8]['body']>>;
+  export type ReplaceTournamentResponse = z.output<(typeof contracts.ENDPOINTS)[9]['response']>;
+  export type ReplaceTournamentBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[9]['body']>>;
+  export type SyncRankingsResponse = z.output<(typeof contracts.ENDPOINTS)[10]['response']>;
 }
 
 export interface ClientConfig {
@@ -257,6 +261,38 @@ export function createClient(config: ClientConfig) {
       body: params.body,
       voterDependent: false,
     }) as Promise<C.PublishTournamentResponse>;
+  },
+  /**
+   * Validate a corrected lineup for an open tournament and show which groups keep their votes.
+   *
+   * `POST /api/v1/admin/tournaments/{slug}/replace/preview` — FR-201, FR-202, FR-203, FR-206.
+   * Documented failures: NOT_FOUND, NOT_REPLACEABLE, UNRESOLVED_PLAYERS, MALFORMED_PAYLOAD, START_NOT_IN_FUTURE, DUPLICATE_PLAYER, POINTS_MISMATCH, INVALID_GROUP_SIZE, UNAUTHORISED.
+   */
+  async previewReplacement(params: { slug: string; body: C.PreviewReplacementBody }): Promise<C.PreviewReplacementResponse> {
+    const path = `/admin/tournaments/${encodeURIComponent(String(params.slug))}/replace/preview`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      body: params.body,
+      voterDependent: false,
+    }) as Promise<C.PreviewReplacementResponse>;
+  },
+  /**
+   * Invalidate an open tournament and publish its corrected lineup at the same address, carrying over unchanged groups.
+   *
+   * `POST /api/v1/admin/tournaments/{slug}/replace` — FR-204, FR-205, FR-207, FR-208, FR-209, FR-210.
+   * Documented failures: NOT_FOUND, NOT_REPLACEABLE, UNRESOLVED_PLAYERS, MALFORMED_PAYLOAD, START_NOT_IN_FUTURE, DUPLICATE_PLAYER, POINTS_MISMATCH, INVALID_GROUP_SIZE, NOT_CONFIRMED, UNAUTHORISED.
+   */
+  async replaceTournament(params: { slug: string; body: C.ReplaceTournamentBody }): Promise<C.ReplaceTournamentResponse> {
+    const path = `/admin/tournaments/${encodeURIComponent(String(params.slug))}/replace`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      body: params.body,
+      voterDependent: false,
+    }) as Promise<C.ReplaceTournamentResponse>;
   },
   /**
    * Import the public ranking sheet into players and rating snapshots.

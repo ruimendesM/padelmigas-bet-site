@@ -119,6 +119,9 @@ export function toTournament(row: Row): Tournament {
     slug: str(row, 'slug'),
     startsAt: instant(row, 'starts_at'),
     publishedAt: instantOrNull(row, 'published_at'),
+    // Feature 003. Both or neither, enforced by `tournaments_invalidation_complete`.
+    invalidatedAt: instantOrNull(row, 'invalidated_at'),
+    replacedById: strOrNull(row, 'replaced_by_id') as Tournament['replacedById'],
   };
 }
 

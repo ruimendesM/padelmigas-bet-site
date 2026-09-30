@@ -2,6 +2,7 @@ import type { GroupResultsDto } from '@padelmigas/contracts';
 import type { GroupId } from '@padelmigas/contracts/common';
 import { domainError, isRevealed, scoreGroup } from '@padelmigas/core';
 import type { Deps, VoterScoped } from '../handler.js';
+import { loadInvalidationContext } from '../invalidation.js';
 import { toGroupResultsDto } from '../views.js';
 
 /**
@@ -32,7 +33,9 @@ export async function getGroupResults(
     ? (await deps.ballots.findOwn(input.groupId, input.caller.voterId)) !== null
     : false;
 
-  if (!isRevealed({ tournament, hasVoted, now: deps.clock.now() })) {
+  const liveSuccessor = (await loadInvalidationContext(tournament, deps))?.liveSuccessor ?? null;
+
+  if (!isRevealed({ tournament, hasVoted, now: deps.clock.now(), liveSuccessor })) {
     throw domainError(
       'RESULTS_HIDDEN',
       'Vota neste grupo para veres a previsão da malta, ou espera pelo início do torneio.',

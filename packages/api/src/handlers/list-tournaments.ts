@@ -20,19 +20,35 @@ export const listTournaments: Handler<TournamentListQueryDto, TournamentListResp
     status: query.status,
     limit: query.limit,
     cursor: query.cursor ?? null,
+    includeInvalidated: query.includeInvalidated,
     // Open vs closed is decided from the server clock alone and passed down; the store never reads
     // a clock of its own (SC-007).
     now,
   });
 
-  return {
-    tournaments: page.items.map((item) =>
+  // Invalidated items are rare (a correction, a handful a year) and each needs its live successor
+  // for `resultsWithheld`, so one lookup per such item rather than a recursive join for all
+  // (feature 003).
+  const tournaments = await Promise.all(
+    page.items.map(async (item) =>
       toTournamentSummaryDto(item.tournament, {
         groupCount: item.groupCount,
         ballotCount: item.ballotCount,
         now,
+        ...(item.replacedBy === null
+          ? {}
+          : {
+              replacement: {
+                replacedBy: item.replacedBy,
+                liveSuccessor: await deps.tournaments.findLiveSuccessor(item.tournament.id),
+              },
+            }),
       }),
     ),
+  );
+
+  return {
+    tournaments,
     nextCursor: page.nextCursor,
   };
 };

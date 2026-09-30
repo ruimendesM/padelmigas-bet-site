@@ -35,6 +35,8 @@ export function createHistoryRepository(sql: Sql): HistoryRepository {
                t.slug,
                t.starts_at,
                t.published_at,
+               t.invalidated_at,
+               t.replaced_by_id,
                g.label                      as group_label,
                a.partner_id,
                partner.display_name         as partner_name,
@@ -56,8 +58,11 @@ export function createHistoryRepository(sql: Sql): HistoryRepository {
           join ballots ba on ba.group_id = gr.id
           group by gr.tournament_id
         ) bc on bc.tournament_id = t.id
-        -- Drafts are never public, so they never appear in a player's history either.
+        -- Drafts are never public, so they never appear in a player's history either. Invalidated
+        -- tournaments are left out so a corrected lineup does not list the same event twice
+        -- (feature 003, FR-214).
         where t.published_at is not null
+          and t.invalidated_at is null
         order by t.published_at desc, t.id desc
       `;
       return rows.map(toAppearance);

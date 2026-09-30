@@ -46,7 +46,8 @@ export async function castBallot(
     throw domainError('NOT_FOUND', 'Grupo não encontrado.');
   }
 
-  if (!isVotingOpen(tournament, deps.clock.now())) {
+  const now = deps.clock.now();
+  if (!isVotingOpen(tournament, now)) {
     throw domainError('VOTING_CLOSED', 'As votações deste torneio já fecharam.');
   }
 
@@ -56,7 +57,14 @@ export async function castBallot(
     groupId: validated.groupId,
     voterId,
     ordering: validated.ordering,
+    now,
   });
+
+  // The tournament was replaced (or its window shut) between the check above and the insert's lock
+  // (feature 003, research R4). Same answer as the check above would have given.
+  if (outcome.kind === 'closed') {
+    throw domainError('VOTING_CLOSED', 'As votações deste torneio já fecharam.');
+  }
 
   if (outcome.kind === 'already-voted') {
     throw domainError('ALREADY_VOTED', 'Já votaste neste grupo. Cada pessoa vota uma vez.');
