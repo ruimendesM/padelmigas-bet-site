@@ -26,6 +26,16 @@ fictional — see [contracts/lineup-payload.example.json](./contracts/lineup-pay
 HTTP GET plus an upsert. The dated columns give a free rating history, which populates
 `player_ratings` and lets a tournament capture points as of its publish date (FR-007).
 
+> **Amended 2026-09-30 — only column C is read.** Shape observed on 2026-09-28: the file had become
+> an uploaded workbook with a single tab, and the export URL pinned to the old `gid` answered HTTP
+> 400. The export without `gid` returns the first tab and works; `RANKINGS_CSV_URL` must not pin one.
+> 257 rows plus a header, `ID`, `Nome`, then 26 dated columns, newest first. For days 1–12 the headers
+> are month-first (`09-12-2026` is 12 September, `08/05/2026` is 5 August) while the rest are
+> day-first, and one year is mistyped (`08-08-20262`). A day-first parser cannot tell these apart,
+> and "the history is free" no longer holds: it arrives misdated. The import now reads column C as
+> the current points and dates it per FR-027. The only reliable signal left in the headers is their
+> order, and a single column does not need it.
+
 ### F2 — Names are unique and match the lineup after normalisation
 
 Checked the 24 names from a real 12-pair lineup against the sheet:

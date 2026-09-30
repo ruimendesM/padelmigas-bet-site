@@ -20,8 +20,8 @@ collapsing. No fuzzy, phonetic, or nickname matching. A payload entry may carry 
 `externalId`, which wins over name matching and is the required disambiguation when two real people
 share a name. Every sync re-checks the source for colliding match keys and aborts the whole import if
 one exists. An unresolved name blocks the entire publish with the offending entries named; the system
-never creates a player under a guessed identity. Rating snapshots from the sheet's dated columns
-populate `player_ratings`, and a tournament captures each player's points at publish time so the
+never creates a player under a guessed identity. Rating snapshots from the sheet's column C
+populate `player_ratings` (FR-027, amended 2026-09-30; previously every dated column), and a tournament captures each player's points at publish time so the
 displayed figures never change retroactively.
 
 ## Consequences
@@ -40,7 +40,9 @@ displayed figures never change retroactively.
   forever, and a future collision requires payloads to carry ids for those entries.
 - A renamed player on the sheet creates a new `match_key`; reconciling that is a manual step.
 - The sheet's dated column headers are inconsistently formatted (`26/08/2026` and `22-08-2026` both
-  occur), so parsing must be tolerant rather than assume a format.
+  occur), so parsing must be tolerant rather than assume a format. **Amended 2026-09-30**: by then
+  some headers were month-first and could not be told apart from day-first ones, so only column C
+  is read and its date is checked against the sync day and stored dates (FR-027).
 
 ### Neutral
 - The importer keeps the raw CSV snapshot, which doubles as an audit trail and a stale-source

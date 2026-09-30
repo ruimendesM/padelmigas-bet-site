@@ -56,9 +56,15 @@ erDiagram
 | Column      | Type                                       | Notes                                                                                   |
 | ----------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
 | `player_id` | `uuid` FK → `players.id` ON DELETE CASCADE |                                                                                         |
-| `rated_on`  | `date`                                     | parsed from the sheet's dated column headers (both `dd/mm/yyyy` and `dd-mm-yyyy` occur) |
+| `rated_on`  | `date`                                     | column C's header date, or the sync day (FR-027, amended 2026-09-30)                    |
 | `points`    | `integer` NOT NULL CHECK (`points >= 0`)   |                                                                                         |
 | PK          | (`player_id`, `rated_on`)                  | re-running a sync is idempotent                                                         |
+
+> **Amended 2026-09-30.** A sync writes one row per player, from the sheet's column C only. `rated_on`
+> is column C's header date, or the sync day in `Europe/Lisbon` when that header is unparseable,
+> in the future, or earlier than `max(rated_on)` already stored (FR-027). No schema change: the
+> columns, key and idempotence are as before. Rows written by earlier syncs from later columns are
+> left in place, except future-dated ones, removed once by hand before the first sync (T137).
 
 ### `tournaments`
 
