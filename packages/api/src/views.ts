@@ -3,10 +3,11 @@ import type {
   GroupResultsDto,
   OwnBallotDto,
   PairDto,
+  TournamentInvalidationDto,
   TournamentSummaryDto,
 } from '@padelmigas/contracts';
 import type { Ballot, GroupResults, GroupWithPairs, Pair, Tournament } from '@padelmigas/core';
-import { publicStatusAt } from '@padelmigas/core';
+import { isRevealed, publicStatusAt } from '@padelmigas/core';
 
 /**
  * Domain → wire serialisation.
@@ -50,7 +51,13 @@ export function toPairDto(pair: Pair): PairDto {
  */
 export function toTournamentSummaryDto(
   tournament: Tournament,
-  options: { groupCount: number; ballotCount: number; now: Date },
+  options: {
+    groupCount: number;
+    ballotCount: number;
+    now: Date;
+    /** Required for an invalidated tournament (feature 003); ignored otherwise. */
+    replacement?: InvalidationContext;
+  },
 ): TournamentSummaryDto {
   const status = publicStatusAt(tournament, options.now);
   if (status === null) {
@@ -64,6 +71,41 @@ export function toTournamentSummaryDto(
     status,
     groupCount: options.groupCount,
     ballotCount: options.ballotCount,
+    ...(tournament.invalidatedAt === null
+      ? {}
+      : { invalidation: toInvalidationDto(tournament, options.now, options.replacement) }),
+  };
+}
+
+/** What an invalidated tournament's summary needs beyond the tournament itself (feature 003). */
+export interface InvalidationContext {
+  /** The direct replacement, linked from the invalidated page (FR-212). */
+  readonly replacedBy: Tournament | null;
+  /** The live end of the chain, which decides whether results are withheld (FR-213). */
+  readonly liveSuccessor: Tournament | null;
+}
+
+function toInvalidationDto(
+  tournament: Tournament,
+  now: Date,
+  context: InvalidationContext | undefined,
+): TournamentInvalidationDto {
+  // Both are guaranteed by `tournaments_invalidation_complete` and the chain invariant. Missing
+  // means a caller forgot to load them, and a link to nowhere is worse than a loud failure.
+  if (tournament.invalidatedAt === null || !context?.replacedBy) {
+    throw new Error(`Invalidated tournament ${tournament.id} serialised without its replacement.`);
+  }
+  return {
+    invalidatedAt: tournament.invalidatedAt.toISOString(),
+    replacedBy: { slug: context.replacedBy.slug, name: context.replacedBy.name },
+    // The same gate the groups go through, asked for an anonymous caller: withheld is about
+    // everyone, not about who is asking (FR-213).
+    resultsWithheld: !isRevealed({
+      tournament,
+      hasVoted: false,
+      now,
+      liveSuccessor: context.liveSuccessor,
+    }),
   };
 }
 

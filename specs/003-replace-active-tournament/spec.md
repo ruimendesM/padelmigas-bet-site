@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-30
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Replace an active tournament. The organiser can replace a published tournament whose voting is still open with a corrected lineup (e.g. pairs withdrew or changed). The previous tournament is marked "invalidated" but kept as history; a new tournament with fresh voting replaces it. Decisions: (1) A group is "unchanged" when the replacement has a group with the same label AND the exact same set of pairs (same two players per pair); points, seeds and club changes are ignored. Ballots on unchanged groups carry over to the replacement group, so those voters keep their vote and see results. (2) The replacement takes over the original public URL (slug); the invalidated one moves to a derived slug (e.g. <slug>-invalidado-1). (3) The invalidated tournament is hidden from active/landing listings, shown in history with an "Invalidado" badge, read-only results, and a link to its replacement. (4) Changed groups start with zero ballots; everyone including previous voters may vote fresh; no per-group notice. Only open (not yet started) published tournaments can be replaced; replacement goes through the same preview-then-confirm flow as publishing, and the preview shows which groups will keep their votes."
 

@@ -55,6 +55,9 @@ export const ERROR_CODES = [
   'SLUG_TAKEN',
   'NOT_CONFIRMED',
 
+  // Replacing a tournament (feature 003, FR-201, FR-205)
+  'NOT_REPLACEABLE',
+
   // Ranking import (FR-004)
   'DUPLICATE_MATCH_KEY',
 

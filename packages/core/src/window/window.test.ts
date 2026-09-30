@@ -24,8 +24,12 @@ function tournament(overrides: Partial<Tournament> = {}): Tournament {
       overrides.publishedAt === undefined
         ? new Date('2026-11-01T10:00:00.000Z')
         : overrides.publishedAt,
+    invalidatedAt: overrides.invalidatedAt ?? null,
+    replacedById: overrides.replacedById ?? null,
   };
 }
+
+const REPLACEMENT_ID = '00000000-0000-4000-8000-000000000002' as TournamentId;
 
 describe('tournamentStatusAt', () => {
   it('is open one millisecond before the start instant', () => {
@@ -52,6 +56,15 @@ describe('tournamentStatusAt', () => {
     const draft = tournament({ publishedAt: null });
     expect(tournamentStatusAt(draft, new Date(START.getTime() + 86_400_000))).toBe('draft');
   });
+
+  it('is closed once invalidated, even well before the start instant', () => {
+    // A replaced tournament accepts no ballots however much time is left (FR-211).
+    const invalidated = tournament({
+      invalidatedAt: new Date('2026-11-15T10:00:00.000Z'),
+      replacedById: REPLACEMENT_ID,
+    });
+    expect(tournamentStatusAt(invalidated, new Date(START.getTime() - 86_400_000))).toBe('closed');
+  });
 });
 
 describe('isVotingOpen', () => {
@@ -61,6 +74,14 @@ describe('isVotingOpen', () => {
 
   it('refuses a ballot at the boundary instant', () => {
     expect(isVotingOpen(tournament(), new Date(START.getTime()))).toBe(false);
+  });
+
+  it('refuses a ballot on an invalidated tournament before the start', () => {
+    const invalidated = tournament({
+      invalidatedAt: new Date('2026-11-15T10:00:00.000Z'),
+      replacedById: REPLACEMENT_ID,
+    });
+    expect(isVotingOpen(invalidated, new Date(START.getTime() - 1))).toBe(false);
   });
 
   it('never opens for an unpublished tournament', () => {

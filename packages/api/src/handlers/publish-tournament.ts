@@ -1,12 +1,12 @@
 import type { PublishRequest, TournamentDetailDto } from '@padelmigas/contracts';
 import {
-  deriveLineup,
   domainError,
   isVotingOpen,
-  toMatchKey,
-  type LineupInput,
+  type DerivedLineup,
+  type TournamentPublication,
 } from '@padelmigas/core';
 import type { Handler } from '../handler.js';
+import { deriveFromPayload, toLineupInput } from '../lineup-input.js';
 import { toGroupDto, toTournamentSummaryDto } from '../views.js';
 
 /**
@@ -31,36 +31,8 @@ export const publishTournament: Handler<PublishRequest, TournamentDetailDto> = a
     ]);
   }
 
-  const input: LineupInput = {
-    name: payload.name,
-    ...(payload.slug === undefined ? {} : { slug: payload.slug }),
-    startsAt: payload.startsAt,
-    pairs: payload.pairs.map((pair) => ({
-      club: pair.club,
-      totalPoints: pair.totalPoints,
-      ...(pair.group === undefined ? {} : { group: pair.group }),
-      players: [
-        {
-          name: pair.players[0].name,
-          points: pair.players[0].points,
-        },
-        {
-          name: pair.players[1].name,
-          points: pair.players[1].points,
-        },
-      ],
-    })),
-  };
-
-  const matchKeys = [
-    ...new Set(input.pairs.flatMap((pair) => pair.players.map((p) => toMatchKey(p.name)))),
-  ].filter((key) => key.length > 0);
-  // Only the name route remains: since the 2026-08-28 amendment a payload cannot carry an explicit
-  // ranking id, because the sheet reuses ids across different people (FR-004, ADR-007 § Amendment).
-  const known = await deps.players.findByMatchKeys(matchKeys);
-
   const now = deps.clock.now();
-  const derived = deriveLineup(input, known, now);
+  const derived = await deriveFromPayload(toLineupInput(payload), deps, now);
 
   // Checked before the insert so the organiser gets `SLUG_TAKEN` rather than a unique-violation 500.
   // The insert is still the authority — two publishes racing on the same slug are settled by the
@@ -71,7 +43,27 @@ export const publishTournament: Handler<PublishRequest, TournamentDetailDto> = a
     ]);
   }
 
-  const published = await deps.tournaments.publish({
+  const published = await deps.tournaments.publish(toPublication(derived, now));
+
+  const votingOpen = isVotingOpen(published, now);
+
+  return {
+    ...toTournamentSummaryDto(published, {
+      groupCount: published.groups.length,
+      // Freshly published: no ballot can exist yet, so this is 0 by construction rather than by query.
+      ballotCount: 0,
+      now,
+    }),
+    groups: published.groups.map((group) =>
+      // The organiser is not a voter here: no ballot, and no results to reveal on a new tournament.
+      toGroupDto(group, { hasVoted: false, votingOpen, ownBallot: null, results: null }),
+    ),
+  };
+};
+
+/** Derived lineup → what the store writes. Shared with replacement (feature 003). */
+export function toPublication(derived: DerivedLineup, now: Date): TournamentPublication {
+  return {
     name: derived.name,
     slug: derived.slug,
     startsAt: derived.startsAt,
@@ -89,20 +81,5 @@ export const publishTournament: Handler<PublishRequest, TournamentDetailDto> = a
         ],
       })),
     })),
-  });
-
-  const votingOpen = isVotingOpen(published, now);
-
-  return {
-    ...toTournamentSummaryDto(published, {
-      groupCount: published.groups.length,
-      // Freshly published: no ballot can exist yet, so this is 0 by construction rather than by query.
-      ballotCount: 0,
-      now,
-    }),
-    groups: published.groups.map((group) =>
-      // The organiser is not a voter here: no ballot, and no results to reveal on a new tournament.
-      toGroupDto(group, { hasVoted: false, votingOpen, ownBallot: null, results: null }),
-    ),
   };
-};
+}

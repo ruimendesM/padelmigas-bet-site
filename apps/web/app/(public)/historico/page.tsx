@@ -17,7 +17,8 @@ import { EmptyState } from '../../../components/states/index.js';
 export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
-  const { tournaments } = await fetchTournaments({ status: 'closed' });
+  // Replaced lineups are part of the record, marked as such (feature 003, FR-212).
+  const { tournaments } = await fetchTournaments({ status: 'closed', includeInvalidated: true });
 
   if (tournaments.length === 0) {
     return (
@@ -52,23 +53,40 @@ export default async function HistoryPage() {
               {formatDate(tournament.startsAt)} ·{' '}
               {t.tournamentList.ballotCount(tournament.ballotCount)}
             </p>
+            {tournament.invalidation ? (
+              <p className="mt-1 text-xs">
+                <span className="text-danger font-semibold uppercase tracking-wide">
+                  {t.tournament.invalidatedBadge}
+                </span>{' '}
+                <Link
+                  href={`/torneios/${tournament.invalidation.replacedBy.slug}`}
+                  className="text-accent"
+                >
+                  {t.tournament.replacedByLink(tournament.invalidation.replacedBy.name)}
+                </Link>
+              </p>
+            ) : null}
 
-            <div className="mt-3 space-y-6">
-              {tournament.groups.map((group) => (
-                <section key={group.id} aria-label={`${t.common.group} ${group.label}`}>
-                  <h3 className="text-sm font-semibold">
-                    {t.common.group} {group.label} · {t.history.finalPrediction}
-                  </h3>
-                  <GroupResults
-                    state={resultsStateFor({
-                      revealed: !group.votingOpen,
-                      results: group.results ?? null,
-                    })}
-                    pairs={group.pairs}
-                  />
-                </section>
-              ))}
-            </div>
+            {tournament.invalidation?.resultsWithheld ? (
+              <p className="text-ink-muted mt-3 text-xs">{t.tournament.resultsWithheld}</p>
+            ) : (
+              <div className="mt-3 space-y-6">
+                {tournament.groups.map((group) => (
+                  <section key={group.id} aria-label={`${t.common.group} ${group.label}`}>
+                    <h3 className="text-sm font-semibold">
+                      {t.common.group} {group.label} · {t.history.finalPrediction}
+                    </h3>
+                    <GroupResults
+                      state={resultsStateFor({
+                        revealed: !group.votingOpen,
+                        results: group.results ?? null,
+                      })}
+                      pairs={group.pairs}
+                    />
+                  </section>
+                ))}
+              </div>
+            )}
           </article>
         ))}
       </div>

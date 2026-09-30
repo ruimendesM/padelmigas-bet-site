@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   formatPairName,
@@ -61,9 +62,31 @@ export async function generateMetadata({
 export default async function TournamentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const tournament = await load(slug);
+  // Feature 003: a replaced lineup. Its results are withheld while the replacement is still
+  // votable, which the server has already decided (FR-213).
+  const invalidation = tournament.invalidation;
+  const withheld = invalidation?.resultsWithheld === true;
 
   return (
     <>
+      {invalidation ? (
+        <div role="note" className="border-danger mb-4 rounded-md border p-3 text-sm">
+          <span className="text-danger text-xs font-semibold uppercase tracking-wide">
+            {t.tournament.invalidatedBadge}
+          </span>
+          <p className="mt-1">{t.tournament.invalidatedNotice}</p>
+          <Link
+            href={`/torneios/${invalidation.replacedBy.slug}`}
+            className="text-accent mt-1 block"
+          >
+            {t.tournament.replacedByLink(invalidation.replacedBy.name)}
+          </Link>
+          {withheld ? (
+            <p className="text-ink-muted mt-2 text-xs">{t.tournament.resultsWithheld}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <h1 className="text-xl font-semibold tracking-tight">{tournament.name}</h1>
       <p className="text-ink-muted mt-1 text-sm">
         {t.tournament.startsAt}: {formatStartsAt(tournament.startsAt)}
@@ -107,15 +130,17 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
               <p className="text-ink-muted mt-3 text-xs">{t.ballot.closed}</p>
             )}
 
-            <GroupResults
-              // The gate already ran on the server: `results` is present exactly when it opened, so
-              // the component is told what to render rather than deciding it again (FR-020).
-              state={resultsStateFor({
-                revealed: group.hasVoted || !group.votingOpen,
-                results: group.results ?? null,
-              })}
-              pairs={group.pairs}
-            />
+            {withheld ? null : (
+              <GroupResults
+                // The gate already ran on the server: `results` is present exactly when it opened,
+                // so the component is told what to render rather than deciding it again (FR-020).
+                state={resultsStateFor({
+                  revealed: group.hasVoted || !group.votingOpen,
+                  results: group.results ?? null,
+                })}
+                pairs={group.pairs}
+              />
+            )}
           </section>
         ))}
       </div>

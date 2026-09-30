@@ -46,6 +46,12 @@ export const pt = {
     votingClosed: 'Votação encerrada',
     startsAt: 'Início',
     groupsHeading: 'Grupos',
+    // Feature 003
+    invalidatedBadge: 'Invalidado',
+    invalidatedNotice: 'Este alinhamento foi corrigido e substituído.',
+    replacedByLink: (name: string) => `Ver o torneio atual: ${name}`,
+    resultsWithheld:
+      'A previsão deste alinhamento fica disponível quando fechar a votação do torneio que o substituiu.',
   },
 
   ballot: {
@@ -147,6 +153,22 @@ export const pt = {
     warningNO_ROWS_FOUND: 'Não foi encontrada nenhuma tabela de alinhamento na imagem.',
     warningODD_ROW_COUNT:
       'Foi lido um número ímpar de duplas. Confirma se falta ou sobra alguma linha.',
+
+    // Replacing a tournament (feature 003)
+    modeLabel: 'O que queres fazer?',
+    modePublish: 'Publicar um torneio novo',
+    modeReplace: 'Substituir um torneio com votação aberta',
+    replaceTarget: 'Torneio a substituir',
+    replaceChoose: 'Escolher torneio',
+    replaceNoneOpen: 'Não há torneios com votação aberta.',
+    replaceHint:
+      'Cola ou importa o alinhamento corrigido completo. Os grupos com a mesma letra e as mesmas duplas mantêm os votos; os restantes recomeçam a votação.',
+    replacePreviewHeading: (name: string) => `Substitui: ${name}`,
+    keepsVotes: (count: number) => (count === 1 ? 'Mantém 1 voto' : `Mantém ${count} votos`),
+    votingRestarts: 'Votação recomeça',
+    replace: 'Substituir torneio',
+    replacing: 'A substituir…',
+    replaced: 'Torneio substituído. O anterior ficou marcado como invalidado.',
   },
 
   errors: {
@@ -162,6 +184,8 @@ export const pt = {
     INVALID_GROUP_SIZE: 'Um grupo tem de ter entre 3 e 6 duplas.',
     SLUG_TAKEN: 'Já existe um torneio com este endereço.',
     NOT_CONFIRMED: 'A publicação tem de ser confirmada.',
+    NOT_REPLACEABLE:
+      'Este torneio já não pode ser substituído: a votação fechou ou já foi substituído.',
     DUPLICATE_MATCH_KEY: 'Dois jogadores do ranking têm o mesmo nome. Resolve manualmente.',
     INCOMPLETE_BALLOT: 'Falta atribuir todas as posições.',
     DUPLICATE_POSITION: 'Cada posição só pode ser usada uma vez.',

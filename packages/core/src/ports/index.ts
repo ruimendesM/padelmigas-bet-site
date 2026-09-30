@@ -21,6 +21,7 @@ import type {
   TournamentWithGroups,
   Voter,
 } from '../domain/index.js';
+import type { CarryOverDecision } from '../replacement/index.js';
 
 /**
  * Repository interfaces — the seam between the domain and any store (Principle II).
@@ -129,17 +130,40 @@ export interface TournamentPublication {
   }[];
 }
 
+/**
+ * A confirmed replacement, fully decided by `core/lineup` and `core/replacement` (feature 003).
+ *
+ * `publication.slug` is the original's slug: the replacement takes over the address (FR-210).
+ */
+export interface TournamentReplacement {
+  readonly originalId: TournamentId;
+  readonly publication: TournamentPublication;
+  /** Per replacement group label: the original group and pair mapping to copy ballots from. */
+  readonly carryOver: readonly CarryOverDecision[];
+  /** Server time, for the under-lock re-check that the original is still open (FR-205). */
+  readonly now: Date;
+}
+
+export type TournamentReplacementOutcome =
+  | { readonly kind: 'replaced'; readonly tournament: TournamentWithGroups }
+  /** The original closed or was replaced by someone else between preview and commit (FR-205). */
+  | { readonly kind: 'not-replaceable' };
+
 export interface TournamentListItem {
   readonly tournament: Tournament;
   readonly groupCount: number;
   /** Ballots across every group of this tournament (FR-019 — never a per-group figure here). */
   readonly ballotCount: number;
+  /** The direct replacement, when the tournament was invalidated (feature 003, FR-212). */
+  readonly replacedBy: Tournament | null;
 }
 
 export interface TournamentListQuery {
   readonly status: TournamentStatus | 'all';
   readonly limit: number;
   readonly cursor: string | null;
+  /** Whether invalidated tournaments are listed (feature 003). */
+  readonly includeInvalidated: boolean;
   /** Server time, supplied by the caller from `Clock` so the store never decides open vs closed. */
   readonly now: Date;
 }
@@ -166,6 +190,23 @@ export interface TournamentRepository {
 
   /** Published tournaments, newest first, cursor-paginated (FR-023). Drafts are never returned. */
   listPublished(query: TournamentListQuery): Promise<TournamentListPage>;
+
+  /**
+   * Invalidates the original and publishes its replacement in ONE transaction (FR-204): renames
+   * the original to a derived slug, inserts the replacement at the original's slug, copies the
+   * ballots of carried-over groups, and links the two.
+   *
+   * Must lock the original and re-check, under that lock, that it is neither invalidated nor past
+   * its start, answering `not-replaceable` otherwise. The same lock is what keeps a ballot racing
+   * the replacement from being stored on the original only (research R4).
+   */
+  replace(replacement: TournamentReplacement): Promise<TournamentReplacementOutcome>;
+
+  /**
+   * The live tournament at the end of an invalidated tournament's replacement chain, or `null`
+   * for a tournament that is not invalidated.
+   */
+  findLiveSuccessor(id: TournamentId): Promise<Tournament | null>;
 }
 
 export interface GroupRepository {
@@ -207,6 +248,8 @@ export interface BallotInsert {
   readonly groupId: GroupId;
   readonly voterId: VoterId;
   readonly ordering: readonly BallotEntry[];
+  /** Server time, for the under-lock re-check of the window (research R4). */
+  readonly now: Date;
 }
 
 export type BallotInsertOutcome =
@@ -216,7 +259,12 @@ export type BallotInsertOutcome =
    * thrown driver error so the handler answers `409 ALREADY_VOTED` instead of a 500 — the exact
    * failure Risk R7 names, under two concurrent submissions.
    */
-  | { readonly kind: 'already-voted' };
+  | { readonly kind: 'already-voted' }
+  /**
+   * The tournament was invalidated or its window shut after the handler checked it but before the
+   * insert could take its lock (feature 003, research R4). Answered as `VOTING_CLOSED`.
+   */
+  | { readonly kind: 'closed' };
 
 export interface BallotRepository {
   /**

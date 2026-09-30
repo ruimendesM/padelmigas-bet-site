@@ -83,6 +83,22 @@ export type PairDto = z.infer<typeof pair>;
 export const tournamentStatus = z.enum(['open', 'closed']);
 export type TournamentStatusDto = z.infer<typeof tournamentStatus>;
 
+/**
+ * Present only on a tournament that was replaced by a corrected lineup (feature 003, FR-212).
+ * An invalidated tournament reports `status: 'closed'`: it accepts no ballots (research R2).
+ */
+export const tournamentInvalidation = z.object({
+  invalidatedAt: isoInstant,
+  /** The direct replacement. If that too was replaced, its own page links onward. */
+  replacedBy: z.object({ slug: z.string(), name: z.string() }),
+  /**
+   * True while the tournament that replaced it is still open for voting: until then the crowd
+   * results here are withheld from everyone (FR-213).
+   */
+  resultsWithheld: z.boolean(),
+});
+export type TournamentInvalidationDto = z.infer<typeof tournamentInvalidation>;
+
 export const tournamentSummary = z.object({
   id: tournamentId,
   slug: z.string(),
@@ -97,6 +113,8 @@ export const tournamentSummary = z.object({
    * (SC-006).
    */
   ballotCount: z.number().int().min(0),
+  /** Absent unless the tournament was replaced (feature 003). */
+  invalidation: tournamentInvalidation.optional(),
 });
 export type TournamentSummaryDto = z.infer<typeof tournamentSummary>;
 
@@ -104,6 +122,14 @@ export const tournamentListQuery = z.object({
   status: z.enum(['open', 'closed', 'all']).default('all'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.string().min(1).optional(),
+  /**
+   * Whether replaced tournaments are listed (feature 003, FR-211, FR-212). Off by default so a live
+   * listing never shows a superseded lineup; the history view turns it on.
+   */
+  includeInvalidated: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 export type TournamentListQueryDto = z.infer<typeof tournamentListQuery>;
 
@@ -140,6 +166,24 @@ export const lineupPreview = z.object({
   resolvedPlayers: z.array(resolvedPlayer),
 });
 export type LineupPreviewDto = z.infer<typeof lineupPreview>;
+
+// ---------------------------------------------------------------------------------------------
+// Outbound: the replacement preview (feature 003, FR-203)
+// ---------------------------------------------------------------------------------------------
+
+export const carryOver = z.object({
+  /** True when the group keeps the original group's ballots (FR-206). */
+  keepsVotes: z.boolean(),
+  /** Ballots that will carry over; 0 whenever `keepsVotes` is false. Organiser-only figure. */
+  ballotCount: z.number().int().min(0),
+});
+export type CarryOverDto = z.infer<typeof carryOver>;
+
+export const replacementPreview = lineupPreview.extend({
+  replaces: z.object({ id: tournamentId, slug: z.string(), name: z.string() }),
+  groups: z.array(previewGroup.extend({ carryOver })),
+});
+export type ReplacementPreviewDto = z.infer<typeof replacementPreview>;
 
 // ---------------------------------------------------------------------------------------------
 // Inbound: a lineup screenshot to extract from (FR-101, FR-117)

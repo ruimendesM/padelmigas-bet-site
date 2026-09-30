@@ -9,6 +9,8 @@ export type { CallerContext, Deps, Handler, NullaryHandler, VoterScoped } from '
 export { previewLineup } from './handlers/preview-lineup.js';
 export { extractLineup } from './handlers/extract-lineup.js';
 export { publishTournament } from './handlers/publish-tournament.js';
+export { previewReplacement, replaceTournament } from './handlers/replace-tournament.js';
+export type { ReplaceInput } from './handlers/replace-tournament.js';
 export { syncRankings } from './handlers/sync-rankings.js';
 export { listTournaments } from './handlers/list-tournaments.js';
 export { getTournamentDetail } from './handlers/get-tournament-detail.js';
@@ -25,4 +27,4 @@ export {
   toPairDto,
   toTournamentSummaryDto,
 } from './views.js';
-export type { GroupViewState } from './views.js';
+export type { GroupViewState, InvalidationContext } from './views.js';

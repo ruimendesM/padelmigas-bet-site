@@ -18,6 +18,11 @@ export interface RevealInput {
   /** Whether THIS caller has a ballot for the group in question. */
   readonly hasVoted: boolean;
   readonly now: Date;
+  /**
+   * For an invalidated tournament only: the live tournament at the end of its replacement chain.
+   * Ignored for a live tournament. Omitted or `null` for an invalidated one fails closed.
+   */
+  readonly liveSuccessor?: Tournament | null;
 }
 
 export function isRevealed(input: RevealInput): boolean {
@@ -26,6 +31,13 @@ export function isRevealed(input: RevealInput): boolean {
   // naive form of this gate ("not open ⇒ closed ⇒ reveal") would treat an unpublished tournament as
   // finished and expose it.
   if (status === 'draft') return false;
+  // An invalidated tournament's groups may live on, carried over, in a replacement that is still
+  // open. Its frozen results stay hidden from everyone until that replacement closes, or they would
+  // be a way to read the crowd without voting (feature 003, FR-213, research R3).
+  if (input.tournament.invalidatedAt !== null) {
+    const successor = input.liveSuccessor ?? null;
+    return successor !== null && tournamentStatusAt(successor, input.now) === 'closed';
+  }
   // Closed reveals to everyone: after the start there is nothing left to influence (FR-021).
   if (status === 'closed') return true;
   // While open, only a voter has earned the reveal — seeing the crowd first would bias the ballot.
