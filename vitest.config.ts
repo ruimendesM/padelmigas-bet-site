@@ -19,6 +19,9 @@ export default defineConfig({
         // Added for feature 002: a misread the flags fail to mark reaches a public page looking
         // correct, which is the same class of user-visible defect as the four modules above.
         'packages/core/src/lineup-extraction/**/*.ts',
+        // Added for the 2026-09-30 amendment (FR-027): a wrong column or a wrong date here puts wrong
+        // current points on every player page and lineup preview, looking correct.
+        'packages/core/src/rankings/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/index.ts.map'],
       thresholds: {

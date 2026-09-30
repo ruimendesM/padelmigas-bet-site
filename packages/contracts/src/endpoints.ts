@@ -242,9 +242,11 @@ export const ENDPOINTS = [
     pathParams: [],
     response: rankingsSyncResponse,
     successStatus: 200,
-    errors: ['DUPLICATE_MATCH_KEY', 'UNAUTHORISED'],
+    // `MALFORMED_PAYLOAD` is the sheet changing shape: a missing `ID` or `Nome`, or a column C that
+    // is not points (FR-027). It was always possible and is now documented.
+    errors: ['DUPLICATE_MATCH_KEY', 'MALFORMED_PAYLOAD', 'UNAUTHORISED'],
     voterDependent: false,
-    requirements: ['FR-004', 'FR-007'],
+    requirements: ['FR-004', 'FR-007', 'FR-027'],
   },
 ] as const satisfies readonly EndpointDefinition[];
 

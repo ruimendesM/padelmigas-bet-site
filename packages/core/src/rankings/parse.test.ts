@@ -3,12 +3,13 @@ import { DomainError } from '../errors.js';
 import { parseRankingCsv, parseSheetDateHeader } from './parse.js';
 
 /**
- * Ranking CSV parsing (FR-004, research F1).
+ * Ranking CSV parsing (FR-004, FR-027, research F1).
  *
- * The shape is not hypothetical — it was observed on 2026-08-27: `ID`, `Nome`, then 17 dated rating
- * columns, most recent first, with date headers inconsistently formatted (`26/08/2026` and
- * `22-08-2026` both occur). Parsing must be tolerant of that and intolerant of everything that would
- * let a wrong identity through.
+ * The shape is not hypothetical: `ID`, `Nome`, then dated rating columns, most recent first. By
+ * 2026-09-28 the headers mixed day-first and month-first dates that no parser can tell apart, so only
+ * column C — the current points — is read (FR-027, amended 2026-09-30). Parsing must be tolerant of
+ * everything after column C and intolerant of everything that would let a wrong identity or a wrong
+ * number through.
  */
 
 describe('parseSheetDateHeader', () => {
@@ -54,7 +55,25 @@ describe('parseRankingCsv', () => {
     '102,"Vasco Trindade",660,655',
   ].join('\n');
 
-  it('reads players with their dated snapshots', () => {
+  /** Ten valid rows, so a single bad column C cell stays under the one-in-ten abort threshold. */
+  function tenRows(columnC: (index: number) => string): string {
+    const rows = Array.from(
+      { length: 10 },
+      (_, index) => `${500 + index},"Jogador ${index}",${columnC(index)}`,
+    );
+    return ['ID,Nome,26/08/2026', ...rows].join('\n');
+  }
+
+  function caught(run: () => unknown): DomainError | undefined {
+    try {
+      run();
+    } catch (error) {
+      return error as DomainError;
+    }
+    return undefined;
+  }
+
+  it('reads players with one snapshot each, from column C', () => {
     const result = parseRankingCsv(csv);
 
     expect(result.rowsRead).toBe(2);
@@ -64,14 +83,35 @@ describe('parseRankingCsv', () => {
       displayName: 'Afonso Bastos',
       matchKey: 'afonso bastos',
     });
-    expect(result.snapshots.filter((s) => s.matchKey === 'afonso bastos')).toEqual([
-      { matchKey: 'afonso bastos', ratedOn: '2026-08-26', points: 533 },
-      { matchKey: 'afonso bastos', ratedOn: '2026-08-22', points: 530 },
+    // The 530 in column D is not read: history is no longer collected from the sheet (FR-027).
+    expect(result.snapshots).toEqual([
+      { matchKey: 'afonso bastos', points: 533 },
+      { matchKey: 'vasco trindade', points: 660 },
     ]);
   });
 
-  it('reports the newest rated date it saw', () => {
-    expect(parseRankingCsv(csv).latestRatedOn).toBe('2026-08-26');
+  it("reports column C's raw header and its parsed date", () => {
+    const result = parseRankingCsv(csv);
+    expect(result.ratingHeader).toBe('26/08/2026');
+    expect(result.headerRatedOn).toBe('2026-08-26');
+  });
+
+  it("reports a null date when column C's header is not a date", () => {
+    // The date rule falls back to the sync day; the parser only reports what it saw (FR-027).
+    const typo = ['ID,Nome,08-08-20262', '101,"Afonso Bastos",533'].join('\n');
+    const result = parseRankingCsv(typo);
+    expect(result.ratingHeader).toBe('08-08-20262');
+    expect(result.headerRatedOn).toBeNull();
+    expect(result.snapshots).toEqual([{ matchKey: 'afonso bastos', points: 533 }]);
+  });
+
+  it('ignores every column after C, even when its header or cells are broken', () => {
+    // The real sheet on 2026-09-28: a mistyped year and a month-first date after column C.
+    const broken = [
+      'ID,Nome,26/09/2026,08-08-20262,09-12-2026,Notas',
+      '101,"Afonso Bastos",533,lixo,-4,"qualquer, coisa"',
+    ].join('\n');
+    expect(parseRankingCsv(broken).snapshots).toEqual([{ matchKey: 'afonso bastos', points: 533 }]);
   });
 
   it('handles CRLF line endings', () => {
@@ -98,23 +138,66 @@ describe('parseRankingCsv', () => {
     expect(parseRankingCsv(unquoted).players[0]?.displayName).toBe('Duarte Vilaça');
   });
 
-  it('skips a blank rating cell rather than recording zero', () => {
-    // A blank means "not rated on that date", which is not the same as zero points.
-    const sparse = ['ID,Nome,26/08/2026,22-08-2026', '106,"Xavier Lourenço",449,'].join('\n');
+  it('skips a blank column C cell rather than recording zero', () => {
+    // A blank means "not rated", which is not the same as zero points.
+    const sparse = ['ID,Nome,26/08/2026', '106,"Xavier Lourenço",', '107,"Rita Sá",449'].join('\n');
     const result = parseRankingCsv(sparse);
-    expect(result.snapshots).toEqual([
-      { matchKey: 'xavier lourenço', ratedOn: '2026-08-26', points: 449 },
-    ]);
+    expect(result.players).toHaveLength(2);
+    expect(result.snapshots).toEqual([{ matchKey: 'rita sá', points: 449 }]);
   });
 
-  it('ignores a non-date column between the name and the ratings', () => {
-    const withExtra = ['ID,Nome,Clube,26/08/2026', '107,"Gabriel Rebelo","Clube Norte",481'].join(
-      '\n',
-    );
-    const result = parseRankingCsv(withExtra);
-    expect(result.snapshots).toEqual([
-      { matchKey: 'gabriel rebelo', ratedOn: '2026-08-26', points: 481 },
-    ]);
+  it('imports every player and no points when column C is entirely empty', () => {
+    // FR-027: players still import; current points keep their last stored values.
+    const empty = ['ID,Nome,26/08/2026', '106,"Xavier Lourenço",', '107,"Rita Sá",'].join('\n');
+    const result = parseRankingCsv(empty);
+    expect(result.players).toHaveLength(2);
+    expect(result.snapshots).toEqual([]);
+  });
+
+  it('drops a single bad cell when it is at most one in ten', () => {
+    const oneBad = tenRows((index) => (index === 0 ? 'n/a' : String(400 + index)));
+    const result = parseRankingCsv(oneBad);
+    expect(result.players).toHaveLength(10);
+    expect(result.snapshots).toHaveLength(9);
+    expect(result.snapshots.map((s) => s.matchKey)).not.toContain('jogador 0');
+  });
+
+  it('aborts when more than one in ten column C cells is not a number', () => {
+    // Two of ten: column C is probably not points any more, so importing it would be a guess.
+    const twoBad = tenRows((index) => (index < 2 ? 'n/a' : String(400 + index)));
+    const error = caught(() => parseRankingCsv(twoBad));
+    expect(error).toBeInstanceOf(DomainError);
+    expect(error?.code).toBe('MALFORMED_PAYLOAD');
+  });
+
+  it('counts negative and fractional points as not a number', () => {
+    const bad = tenRows((index) => (index === 0 ? '-5' : index === 1 ? '4.5' : '400'));
+    expect(caught(() => parseRankingCsv(bad))?.code).toBe('MALFORMED_PAYLOAD');
+  });
+
+  it('aborts when a text column has been inserted at C', () => {
+    // A "Clube" column landing at C would otherwise import club names as points.
+    const withClub = [
+      'ID,Nome,Clube,26/08/2026',
+      '107,"Gabriel Rebelo","Clube Norte",481',
+      '108,"Ines Moura","Clube Sul",470',
+    ].join('\n');
+    expect(caught(() => parseRankingCsv(withClub))?.code).toBe('MALFORMED_PAYLOAD');
+  });
+
+  it('aborts when the name column sits in column C', () => {
+    const shifted = ['Clube,ID,Nome,26/08/2026', 'Norte,101,"Ana",400'].join('\n');
+    expect(caught(() => parseRankingCsv(shifted))?.code).toBe('MALFORMED_PAYLOAD');
+  });
+
+  it('aborts when the ID column sits in column C', () => {
+    const shifted = ['Nome,Clube,ID,26/08/2026', '"Ana",Norte,101,400'].join('\n');
+    expect(caught(() => parseRankingCsv(shifted))?.code).toBe('MALFORMED_PAYLOAD');
+  });
+
+  it('aborts when the header has no column C', () => {
+    // Without column C there are no current points to import, which means the sheet changed shape.
+    expect(caught(() => parseRankingCsv('ID,Nome\n101,"Ana"'))?.code).toBe('MALFORMED_PAYLOAD');
   });
 
   it('rejects two rows whose names normalise identically', () => {
@@ -124,25 +207,19 @@ describe('parseRankingCsv', () => {
       '\n',
     );
 
-    let caught: DomainError | undefined;
-    try {
-      parseRankingCsv(colliding);
-    } catch (error) {
-      caught = error as DomainError;
-    }
+    const error = caught(() => parseRankingCsv(colliding));
 
-    expect(caught).toBeInstanceOf(DomainError);
-    expect(caught?.code).toBe('DUPLICATE_MATCH_KEY');
-    expect(caught?.issues[0]?.message).toContain('ana silva');
-    expect(caught?.issues[0]?.message).toContain('201');
-    expect(caught?.issues[0]?.message).toContain('202');
+    expect(error).toBeInstanceOf(DomainError);
+    expect(error?.code).toBe('DUPLICATE_MATCH_KEY');
+    expect(error?.issues[0]?.message).toContain('ana silva');
+    expect(error?.issues[0]?.message).toContain('201');
+    expect(error?.issues[0]?.message).toContain('202');
   });
 
   it('accepts two rows sharing an ID, because the real sheet is full of them', () => {
-    // FR-004 as amended 2026-08-28. The live sheet has 784 rows carrying only 756 distinct ids: 18
-    // are shared by 46 rows describing different people. Rejecting a repeat meant every import of
-    // the real sheet aborted. Worse, the old code `continue`d past the repeat, so those people were
-    // silently dropped from the parse before the abort ever fired.
+    // FR-004 as amended 2026-08-28. The live sheet had 784 rows carrying only 756 distinct ids: 18
+    // were shared by 46 rows describing different people. Rejecting a repeat meant every import of
+    // the real sheet aborted.
     const shared = ['ID,Nome,26/08/2026', '301,"Um Nome",400', '301,"Outro Nome",410'].join('\n');
     const result = parseRankingCsv(shared);
 
@@ -151,22 +228,17 @@ describe('parseRankingCsv', () => {
     expect(result.players.map((p) => p.externalId)).toEqual([301, 301]);
     // Both people keep their own rating, keyed by match key rather than by the shared id.
     expect(result.snapshots).toEqual([
-      { matchKey: 'um nome', ratedOn: '2026-08-26', points: 400 },
-      { matchKey: 'outro nome', ratedOn: '2026-08-26', points: 410 },
+      { matchKey: 'um nome', points: 400 },
+      { matchKey: 'outro nome', points: 410 },
     ]);
   });
 
   it('rejects a header without an ID column', () => {
-    expect(() => parseRankingCsv('Nome,26/08/2026\n"Ana",400')).toThrow(DomainError);
+    expect(() => parseRankingCsv('Nome,X,26/08/2026\n"Ana",x,400')).toThrow(DomainError);
   });
 
   it('rejects a header without a name column', () => {
-    expect(() => parseRankingCsv('ID,26/08/2026\n101,400')).toThrow(DomainError);
-  });
-
-  it('rejects a header with no dated columns at all', () => {
-    // Without a date there is no rating history to import, which means the sheet changed shape.
-    expect(() => parseRankingCsv('ID,Nome\n101,"Ana"')).toThrow(DomainError);
+    expect(() => parseRankingCsv('ID,X,26/08/2026\n101,x,400')).toThrow(DomainError);
   });
 
   it('rejects an empty document', () => {
@@ -193,10 +265,32 @@ describe('parseRankingCsv', () => {
     expect(result.skippedRows).toBe(1);
   });
 
+  it('skips a row too short to reach an ID or name column placed after C', () => {
+    // Nothing requires `ID` and `Nome` to come first, only that neither sits in column C.
+    const late = [
+      'Clube,X,26/08/2026,ID,Nome',
+      'Norte,x,400',
+      'Sul,x,410,120',
+      'Este,x,420,121,"Ana"',
+    ];
+    const result = parseRankingCsv(late.join('\n'));
+    expect(result.players.map((p) => p.externalId)).toEqual([121]);
+    expect(result.skippedRows).toBe(2);
+  });
+
+  it('does not count a skipped row towards the bad-cell threshold', () => {
+    // A row without an id is already reported as skipped; its column C must not also abort the sync.
+    const skipped = ['ID,Nome,26/08/2026', ',"Sem ID",lixo', '110,"Válido",400'].join('\n');
+    expect(parseRankingCsv(skipped).snapshots).toEqual([{ matchKey: 'válido', points: 400 }]);
+  });
+
   it('tolerates a row with fewer cells than the header', () => {
-    const short = ['ID,Nome,26/08/2026,22-08-2026', '111,"Curto",420'].join('\n');
+    const short = ['ID,Nome,26/08/2026,22-08-2026', '111,"Curto",420', '112,"Mais Curto"'].join(
+      '\n',
+    );
     const result = parseRankingCsv(short);
-    expect(result.snapshots).toHaveLength(1);
+    expect(result.players).toHaveLength(2);
+    expect(result.snapshots).toEqual([{ matchKey: 'curto', points: 420 }]);
   });
 
   it('accepts a semicolon-delimited export', () => {
@@ -205,19 +299,6 @@ describe('parseRankingCsv', () => {
     const result = parseRankingCsv(semi);
     expect(result.players[0]?.externalId).toBe(112);
     expect(result.snapshots[0]?.points).toBe(430);
-  });
-
-  it('rejects a rating that is not a number', () => {
-    const bad = ['ID,Nome,26/08/2026', '113,"Texto",n/a'].join('\n');
-    const result = parseRankingCsv(bad);
-    // The player is still valid; only that snapshot is dropped.
-    expect(result.players).toHaveLength(1);
-    expect(result.snapshots).toEqual([]);
-  });
-
-  it('rejects a negative rating', () => {
-    const bad = ['ID,Nome,26/08/2026', '114,"Negativo",-5'].join('\n');
-    expect(parseRankingCsv(bad).snapshots).toEqual([]);
   });
 
   it('strips a UTF-8 byte order mark from the header', () => {

@@ -39,7 +39,7 @@ A missing or empty variable must fail startup loudly rather than degrade — no 
 pnpm install
 pnpm generate:client           # emit packages/client from the Zod contracts
 pnpm db:push                   # apply supabase/migrations to the target database
-pnpm rankings:sync             # import ~783 players + dated rating snapshots
+pnpm rankings:sync             # import players + current points from column C (FR-027)
 pnpm dev                       # http://localhost:3000
 ```
 
@@ -108,8 +108,10 @@ pair id. **Expect**: every displayed number matches exactly, and repeated reload
 
 ### V6 — Rankings sync resilience (Risk R3)
 
-1. Run `pnpm rankings:sync` twice. **Expect**: the second run creates no duplicates and rewrites the
-   same snapshots (idempotent).
+1. Run `pnpm rankings:sync` twice on the same day. **Expect**: the second run creates no duplicates
+   and rewrites the same snapshots (idempotent). When the report's `ratedOnBasis` is not `header`,
+   a re-run on a *later* day writes the same points under that day, so current points stay the same
+   (FR-027, amended 2026-09-30).
 2. Point `RANKINGS_CSV_URL` at an unreachable host and run a publish. **Expect**: the import path
    reports staleness and uses the last stored snapshot; it does not invent players.
 3. Feed a CSV containing two rows whose names normalise identically. **Expect**:

@@ -222,6 +222,19 @@ export type LineupExtractionDto = z.infer<typeof lineupExtraction>;
 // Outbound: the rankings sync report
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Why a sync's points carry the date they do (FR-027, amended 2026-09-30). `header` means column C's
+ * header date was used; every other value names why the sync day was used instead.
+ */
+export const RATED_ON_BASES = [
+  'header',
+  'header-unparseable',
+  'header-in-future',
+  'header-before-stored',
+] as const;
+export const ratedOnBasis = z.enum(RATED_ON_BASES);
+export type RatedOnBasis = z.infer<typeof ratedOnBasis>;
+
 export const rankingsSyncResponse = z.object({
   rowsRead: z.number().int().min(0),
   playersCreated: z.number().int().min(0),
@@ -230,6 +243,9 @@ export const rankingsSyncResponse = z.object({
   sourceFetchedAt: isoInstant,
   /** True when the sheet was unreachable and the last stored snapshot was reused (Risk R3). */
   stale: z.boolean(),
+  /** `YYYY-MM-DD` the imported points are stored under (FR-027). */
+  ratedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  ratedOnBasis,
 });
 export type RankingsSyncResponse = z.infer<typeof rankingsSyncResponse>;
 
