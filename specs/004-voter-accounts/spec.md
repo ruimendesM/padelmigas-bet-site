@@ -11,6 +11,17 @@
 > **Numbering note**: requirements and criteria in this spec are numbered from 301 so they never
 > collide with features 001 (FR-001…, SC-001…), 002 (FR-101…, SC-101…) or 003 (FR-201…, SC-201…).
 
+## Clarifications
+
+### Session 2026-10-12
+
+- Q: When someone signs in on a device where they voted logged out in a group whose voting has
+  already closed, should that ballot still move to the account? → A: Move ballots for every group;
+  on a conflict in a closed group keep both ballots (the device's stays with the device's logged-out
+  identity), so a closed group's totals never change.
+- Q: Should the organiser's temporary password stop working after a set time if unused? → A: Yes,
+  it expires 24 hours after the reset.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Register and keep my vote across devices (Priority: P1)
@@ -65,12 +76,14 @@ belongs to the account, and each group counts the person once.
 
 1. **Given** a device whose logged-out visitor voted on a group the account has not voted on,
    **When** the person signs in on that device, **Then** that ballot becomes the account's.
-2. **Given** a device whose logged-out visitor voted on a group the account has already voted on,
-   **When** the person signs in on that device, **Then** the account's ballot is kept, the device's
-   logged-out ballot is discarded, and the group's totals count the person once.
-3. **Given** a device that has never voted, **When** the person signs in, **Then** nothing about
+2. **Given** a device whose logged-out visitor voted on an open group the account has already voted
+   on, **When** the person signs in on that device, **Then** the account's ballot is kept, the
+   device's logged-out ballot is discarded, and the group's totals count the person once.
+3. **Given** the same conflict in a group whose voting has closed, **When** the person signs in,
+   **Then** neither ballot changes and the group's totals stay as they were.
+4. **Given** a device that has never voted, **When** the person signs in, **Then** nothing about
    ballots changes other than the device now showing the account's votes.
-4. **Given** wrong credentials, **When** someone tries to sign in, **Then** sign-in is refused with
+5. **Given** wrong credentials, **When** someone tries to sign in, **Then** sign-in is refused with
    one message that does not reveal whether the username exists, and no ballots move.
 
 ---
@@ -143,7 +156,9 @@ can then vote.
    **Then** that session is no longer signed in.
 4. **Given** a reset account, **When** the person signs in with the temporary password, **Then**
    they must set a new password before they can vote or see the account's votes.
-5. **Given** a visitor who is not the organiser, **When** they attempt to search accounts or reset a
+5. **Given** a temporary password issued more than 24 hours ago and never used, **When** the person
+   tries to sign in with it, **Then** sign-in is refused with the same message as wrong credentials.
+6. **Given** a visitor who is not the organiser, **When** they attempt to search accounts or reset a
    password, **Then** the request is refused.
 
 ---
@@ -157,8 +172,10 @@ can then vote.
   account's ballots are not taken.
 - **Sign in to account B on a device just signed out of account A**: the device is a fresh visitor
   after sign-out, so no ballots of A move to B.
-- **Logged-out ballot in a group whose voting has already closed**, then sign-in: the ballot moves
-  to the account like any other (it was cast while voting was open by the same person).
+- **Logged-out ballot in a group whose voting has already closed**, then sign-in: if the account has
+  not voted there, the ballot moves to the account like any other. If the account has also voted
+  there, neither ballot is touched: the device's ballot stays with the device's former logged-out
+  identity and keeps counting, so the closed group's totals do not change (FR-311).
 - **Sign in while a merge would discard a logged-out ballot**: the person is not asked to choose;
   the account's ballot wins (FR-311).
 - **Ballot carried over by a tournament replacement (feature 003)** belongs to the same voter, so it
@@ -198,8 +215,10 @@ can then vote.
 - **FR-310**: On sign-in, each ballot cast by the device's logged-out visitor in a group the account
   has not voted in MUST become the account's.
 - **FR-311**: On sign-in, where the device's logged-out visitor and the account both voted in the
-  same group, the account's ballot MUST be kept and the device's ballot discarded, so the group
-  counts the person once.
+  same group **and that group's voting is still open**, the account's ballot MUST be kept and the
+  device's ballot discarded, so the group counts the person once. If that group's voting has
+  closed, neither ballot MUST change: the device's ballot stays with the device's former logged-out
+  identity, so a closed group's totals never change after closing.
 - **FR-312**: FR-309–FR-311 MUST apply all-or-nothing: either every move and discard happens, or
   none does and sign-in fails.
 - **FR-313**: A logged-out visitor that already belongs to an account MUST never have its ballots
@@ -224,7 +243,8 @@ can then vote.
 - **FR-319**: The organiser MUST be able to search accounts by part of a username and reset an
   account's password from the private organiser area. Only the organiser can do this.
 - **FR-320**: A reset MUST generate a temporary password, show it to the organiser exactly once, and
-  end every existing session of that account.
+  end every existing session of that account. The temporary password MUST stop working 24 hours
+  after the reset if it has not been used to sign in; the organiser can then reset again.
 - **FR-321**: A person signed in with a temporary password MUST set a new password before they can
   vote or see the account's ballots.
 
@@ -237,7 +257,8 @@ can then vote.
 ### Key Entities
 
 - **Account**: a person's optional sign-in identity — a unique username, a protected password, when
-  it was created, when its password last changed, and whether it must set a new password. Owns
+  it was created, when its password last changed, whether it must set a new password, and when a
+  pending temporary password expires. Owns
   exactly one Voter.
 - **Voter** (existing, from feature 001): the identity ballots belong to. Logged-out visitors have a
   device-bound voter; an account owns one voter that every device signed in to it uses.
@@ -251,10 +272,11 @@ can then vote.
 - **SC-301**: A new visitor can register in under 1 minute.
 - **SC-302**: A signed-in person sees the correct voted state for 100% of groups on every device
   where they are signed in.
-- **SC-303**: 0 groups count the same account more than once, including after any sequence of
-  logged-out votes, registrations, and sign-ins.
+- **SC-303**: 0 groups whose voting is open count the same account more than once, including after
+  any sequence of logged-out votes, registrations, and sign-ins. 0 closed groups change their
+  totals because of a sign-in.
 - **SC-304**: 0 ballots cast logged out on a device are lost when their owner registers or signs in
-  there, except those in groups the account had already voted in.
+  there, except those in open groups the account had already voted in.
 - **SC-305**: A logged-out visitor can still vote in the same number of taps as before this feature.
 - **SC-306**: A person who forgot their password can vote again within 5 minutes of the organiser
   resetting it.
@@ -272,5 +294,3 @@ can then vote.
   anti-abuse stays out of scope, as the constitution allows.
 - Account deletion is out of scope for this feature.
 - Google or any other third-party sign-in is out of scope and will be its own spec.
-- A ballot cast logged out in a group whose voting has since closed still moves to the account on
-  sign-in (to be confirmed in `/speckit-clarify`).
