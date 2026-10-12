@@ -1,14 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: none → 1.0.0 (initial ratification)
-- Modified principles: none (initial adoption)
-- Added sections: Core Principles I–V; Technology & Data Constraints; Development Workflow &
-  Quality Gates; Governance
+- Version change: 1.0.0 → 1.1.0 (MINOR: voter-identity rule materially expanded)
+- Modified principles: none renamed; Technology & Data Constraints → "Voter identity" and
+  "Privacy" bullets expanded to allow optional username + password accounts
+- Added sections: none
 - Removed sections: none
-- Templates requiring review: .specify/templates/plan-template.md (Constitution Check gate),
-  .specify/templates/spec-template.md, .specify/templates/tasks-template.md — read at runtime,
-  no edits made here
-- Deferred TODOs: none
+- Migration impact: existing anonymous voters unaffected; anonymous cookie stays the default and
+  voting never requires an account
+- Templates requiring review: none (plan/spec/tasks templates read this file at runtime)
+- Deferred TODOs: third-party sign-in (Google) to be ruled on by its own spec
 -->
 # Padelmigas Bet Constitution
 
@@ -92,10 +92,15 @@ the dominant long-term cost.
   Padelmigas ranking sheet. Player matching MUST be exact-name after Unicode NFC normalisation,
   case folding, and whitespace collapsing — no fuzzy matching. Unmatched names MUST fail the import
   loudly and be resolved by a human, never auto-created silently under a guessed identity.
-- **Voter identity**: anonymous, cookie-backed voter tokens. No account, no password, no email in
-  phase 1. A cleared cookie or a private window is an accepted new voter; heavier anti-abuse is out
-  of scope until abuse is observed.
-- **Privacy**: no personal data beyond publicly published player names, club, and ranking points.
+- **Voter identity**: anonymous, cookie-backed voter tokens are the default, and voting MUST NOT
+  require an account. A voter MAY optionally create an account identified by a self-chosen
+  username and a password; passwords MUST be stored only as argon2id hashes and MUST NOT leave the
+  server. No email address is collected. An account owns exactly one voter, so the
+  one-ballot-per-voter rule is unchanged. A cleared cookie or a private window without signing in
+  is an accepted new voter; heavier anti-abuse is out of scope until abuse is observed.
+  Third-party sign-in (e.g. Google) is out of scope until a spec of its own allows it.
+- **Privacy**: no personal data beyond publicly published player names, club, ranking points, and
+  the optional account username a voter chooses for themselves.
   Voter records MUST NOT store IP addresses or user agents beyond what is needed for rate limiting,
   and any such data MUST have a stated retention window.
 - **Locale & time**: pt-PT is the primary user language, en as fallback; copy MUST NOT be
@@ -135,4 +140,4 @@ and documentation in this repository.
 - **Runtime guidance**: agent-facing operational guidance lives in `CLAUDE.md`; where it conflicts
   with this constitution, the constitution wins.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-27 | **Last Amended**: 2026-08-27
+**Version**: 1.1.0 | **Ratified**: 2026-08-27 | **Last Amended**: 2026-10-12
