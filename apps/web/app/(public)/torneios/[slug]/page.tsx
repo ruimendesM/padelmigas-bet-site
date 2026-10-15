@@ -10,7 +10,8 @@ import {
 import { isDomainError } from '@padelmigas/core';
 import type { TournamentDetailDto } from '@padelmigas/contracts';
 import { t } from '../../../../src/i18n/index.js';
-import { fetchTournament } from '../../../../src/server/page-data.js';
+import { fetchSignedInAccount, fetchTournament } from '../../../../src/server/page-data.js';
+import { RETURN_PARAM } from '../../../../src/return-path.js';
 import { BallotForm } from '../../../../components/BallotForm.js';
 import { GroupResults } from '../../../../components/GroupResults.js';
 
@@ -61,7 +62,7 @@ export async function generateMetadata({
 
 export default async function TournamentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const tournament = await load(slug);
+  const [tournament, account] = await Promise.all([load(slug), fetchSignedInAccount()]);
   // Feature 003: a replaced lineup. Its results are withheld while the replacement is still
   // votable, which the server has already decided (FR-213).
   const invalidation = tournament.invalidation;
@@ -98,6 +99,18 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
       >
         {tournament.status === 'open' ? t.tournament.votingOpenUntil : t.tournament.votingClosed}
       </p>
+
+      {/* Feature 004: an invitation, never a gate — voting below works without it (FR-301). */}
+      {tournament.status === 'open' && account === null ? (
+        <p className="text-ink-muted mt-3 text-xs">
+          <Link
+            href={`/entrar?${RETURN_PARAM}=${encodeURIComponent(`/torneios/${slug}`)}`}
+            className="text-ink underline"
+          >
+            {t.account.voteHint}
+          </Link>
+        </p>
+      ) : null}
 
       <h2 className="mt-6 text-base font-semibold">{t.tournament.groupsHeading}</h2>
 

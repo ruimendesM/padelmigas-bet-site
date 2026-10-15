@@ -4,6 +4,13 @@ import { GET as DETAIL } from '../../apps/web/app/api/v1/tournaments/[slug]/rout
 import { GET as RESULTS } from '../../apps/web/app/api/v1/groups/[groupId]/results/route.js';
 import { GET as PLAYER } from '../../apps/web/app/api/v1/players/[playerId]/route.js';
 import { POST as CAST } from '../../apps/web/app/api/v1/groups/[groupId]/ballots/route.js';
+import { GET as ACCOUNT, POST as REGISTER } from '../../apps/web/app/api/v1/account/route.js';
+import {
+  DELETE as SIGN_OUT,
+  POST as SIGN_IN,
+} from '../../apps/web/app/api/v1/account/session/route.js';
+import { PUT as CHANGE_PASSWORD } from '../../apps/web/app/api/v1/account/password/route.js';
+import { ACCOUNT_COOKIE_NAME } from '../../apps/web/src/server/account-session.js';
 import { VOTER_COOKIE_NAME } from '../../apps/web/src/server/voter-cookie.js';
 import {
   createGroupWithPairs,
@@ -150,5 +157,59 @@ describe('no voter identity is exposed', () => {
     // The ordering is visible — that is the product — but nothing says whose it is.
     expect(raw).toContain('standings');
     expect(raw).not.toContain('castAt');
+  });
+
+  it('never returns a voter id, account id or password hash from the account routes (feature 004)', async () => {
+    const sql = rawSql();
+    const tournament = await createTournament(sql, { slug: 'anonimo-contas', startsAt: START });
+    const group = await createGroupWithPairs(sql, tournament.id, { size: 3 });
+
+    // A device votes logged out, then registers (adoption), signs in again (merge path), changes its
+    // password and signs out: every account response on the way is checked.
+    const cast = await CAST(
+      jsonRequest(`http://localhost/api/v1/groups/${group.groupId}/ballots`, {
+        ordering: group.pairIds.map((pairId, index) => ({ pairId, position: index + 1 })),
+      }),
+      params({ groupId: group.groupId }),
+    );
+    const voterCookie = cookieFrom(cast, VOTER_COOKIE_NAME) ?? '';
+    const base = 'http://localhost/api/v1';
+    const credentials = { username: 'privada', password: 'palavra-passe-1' };
+
+    const responses: Response[] = [];
+    const registered = await REGISTER(
+      jsonRequest(`${base}/account`, credentials, { cookie: voterCookie }),
+    );
+    responses.push(registered);
+    const session =
+      registered.headers
+        .getSetCookie()
+        .find((value) => value.startsWith(`${ACCOUNT_COOKIE_NAME}=`))
+        ?.split(';')[0] ?? '';
+    responses.push(await ACCOUNT(getRequest(`${base}/account`, { cookie: session })));
+    responses.push(await SIGN_IN(jsonRequest(`${base}/account/session`, credentials)));
+    responses.push(
+      await CHANGE_PASSWORD(
+        jsonRequest(
+          `${base}/account/password`,
+          { currentPassword: credentials.password, newPassword: 'palavra-passe-2' },
+          { method: 'PUT', cookie: session },
+        ),
+      ),
+    );
+    responses.push(await SIGN_OUT());
+
+    const secrets = (
+      await rawSql()<{ id: string; voter_id: string; password_hash: string }[]>`
+        select id, voter_id, password_hash from accounts
+      `
+    ).flatMap((row) => [row.id, row.voter_id, row.password_hash]);
+    secrets.push(...(await voterIds()));
+
+    for (const response of responses) {
+      expect(response.status).toBeLessThan(300);
+      const raw = (await response.text()) + headerText(response).replace(/set-cookie:.*$/gim, '');
+      for (const secret of secrets) expect(raw).not.toContain(secret);
+    }
   });
 });

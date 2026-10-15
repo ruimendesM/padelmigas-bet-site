@@ -21,6 +21,7 @@ import {
 import { api } from '../../src/api.js';
 import { t } from '../../src/i18n/index.js';
 import { LineupDraftTable } from './lineup-draft-table.js';
+import { AccountsPanel } from './accounts-panel.js';
 import { LineupUpload } from './lineup-upload.js';
 
 /**
@@ -568,6 +569,8 @@ export default function AdminPage() {
           </ul>
         </section>
       ) : null}
+
+      <AccountsPanel />
     </>
   );
 }

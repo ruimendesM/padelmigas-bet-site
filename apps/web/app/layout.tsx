@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import { SignOutButton } from '../components/AccountForms.js';
 import { t } from '../src/i18n/index.js';
+import { fetchSignedInAccount } from '../src/server/page-data.js';
 import './globals.css';
 
 /**
@@ -27,7 +29,21 @@ export const viewport: Viewport = {
   themeColor: '#0b1220',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * The header's account area (FR-322). A failure to resolve the account must not take the whole page
+ * down with it — the header simply shows the logged-out links, and voting still works.
+ */
+async function signedInAccount() {
+  try {
+    return await fetchSignedInAccount();
+  } catch (error) {
+    console.error('Could not resolve the signed-in account for the header.', error);
+    return null;
+  }
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const account = await signedInAccount();
   return (
     <html lang="pt-PT">
       <body className="min-h-dvh">
@@ -42,12 +58,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="border-border border-b">
           <nav
             aria-label={t.app.nav.tournaments}
-            className="max-w-content mx-auto flex items-center justify-between gap-4 px-4 py-3"
+            className="max-w-content mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
           >
             <Link href="/" className="text-base font-semibold tracking-tight">
               {t.app.name}
             </Link>
-            <ul className="text-ink-muted flex items-center gap-4 text-sm">
+            <ul className="text-ink-muted flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <li>
                 <Link href="/" className="hover:text-ink">
                   {t.app.nav.tournaments}
@@ -58,6 +74,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {t.app.nav.history}
                 </Link>
               </li>
+              {account ? (
+                <>
+                  <li>
+                    <Link
+                      href="/conta"
+                      className="text-ink block max-w-[12rem] truncate hover:underline"
+                    >
+                      {account.username}
+                    </Link>
+                  </li>
+                  <li>
+                    <SignOutButton className="hover:text-ink" />
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link href="/entrar" className="hover:text-ink">
+                      {t.account.signIn}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/registar" className="hover:text-ink">
+                      {t.account.register}
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </nav>
         </header>

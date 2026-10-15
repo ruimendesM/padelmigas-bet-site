@@ -56,6 +56,7 @@ AccountRepository {
   create({ username, passwordHash, adoptVoterId | null }) → { kind: 'created', account } | { kind: 'username-taken' }
       // adoptVoterId is used only when that voter is unowned; otherwise a new voter is minted (FR-309, FR-313)
   findById(id) → Account | null
+  findCredentialsById(id) → { account, passwordHash } | null       // password change
   findCredentialsByUsername(username) → { account, passwordHash } | null
   search(query, limit) → Account[]
   setPassword(id, passwordHash, now) → Account               // clears temp expiry, bumps session_version

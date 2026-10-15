@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Optional voter accounts (short name: voter-accounts). Visitors can keep voting logged out exactly as today (anonymous device identity). Optionally, a visitor can register with a self-chosen username and a password (no email), sign in, sign out, and change their password. A signed-in person's "already voted" state and own ballot follow them across devices. If someone voted logged out on a device and then registers there, those votes become the account's. If they sign in on a device where they voted logged out, those votes move to the account for groups the account hasn't voted in; where both voted in the same group, the account's vote wins and the device's anonymous vote is discarded. Signing out returns the device to a fresh anonymous visitor. Forgotten password: the organiser can find an account by username and reset its password, which shows a one-time temporary password; the person must change it at next sign-in, and existing sessions for that account end. Nothing else for accounts in this feature (no profiles, no leaderboard). Google sign-in is out of scope (follow-up). pt-PT copy."
 

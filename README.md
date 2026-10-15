@@ -124,7 +124,10 @@ See [ADR-001](docs/adr/ADR-001-monorepo-portable-core.md) and
 
 No real player data is committed. Every name, ranking ID and club in this repository's examples and
 fixtures is fictional. The live player list is fetched at runtime from a ranking source configured
-through `RANKINGS_CSV_URL`, and voting is anonymous: no accounts, no emails, no IP addresses stored.
+through `RANKINGS_CSV_URL`, and voting is anonymous by default: no emails and no IP addresses are
+stored. A voter may optionally create an account (a username and an argon2id-hashed password, nothing
+else) so their vote follows them across devices; voting never requires one
+([ADR-012](docs/adr/ADR-012-optional-voter-accounts.md)).
 
 ## Licence
 

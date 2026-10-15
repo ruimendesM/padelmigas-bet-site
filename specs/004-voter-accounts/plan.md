@@ -100,20 +100,16 @@ packages/core/src/
 packages/db/src/
 ├── accounts.ts           # NEW: create (adopting a voter), findById/ByUsername, search,
 │                         #      setPassword, resetPassword, mergeDeviceVoter (one transaction)
-├── voters.ts / repositories.ts   # isOwned; wire accounts repo
+├── ballots.ts / repositories.ts  # VoterRepository.isOwned; wire accounts repo
 └── index.ts
 packages/api/src/
-├── handler.ts            # Deps + accounts, passwords
-└── handlers/
-    ├── register.ts               # NEW
-    ├── sign-in.ts                # NEW (includes forced change + merge)
-    ├── change-password.ts        # NEW
-    ├── get-account.ts            # NEW
-    ├── search-accounts.ts        # NEW (organiser)
-    └── reset-account-password.ts # NEW (organiser)
+├── handler.ts            # Deps + accounts, passwords; CallerContext.accountId
+└── handlers/accounts.ts  # NEW: register, getAccount, signIn (forced change + merge),
+                          #      changePassword, searchAccounts, resetAccountPassword
 apps/web/
 ├── src/server/
 │   ├── account-session.ts   # NEW: sign/verify pm_account (aud 'account', claim sv), cookies
+│   ├── account-routes.ts    # NEW: auth rate limit, session cookies for the account routes
 │   ├── voter-cookie.ts      # caller resolution: account session first; owned pm_voter ignored
 │   ├── page-data.ts         # caller() uses the same resolution
 │   ├── password-hasher.ts   # NEW: PasswordHasher over @node-rs/argon2 + ARGON2_OPTIONS
@@ -127,8 +123,9 @@ apps/web/
 ├── app/(public)/entrar/page.tsx, registar/page.tsx, conta/page.tsx  # NEW pages
 ├── app/layout.tsx                               # header: username + Sair / Entrar · Registar
 ├── app/admin/accounts-panel.tsx + page.tsx      # search + "Repor palavra-passe"
+├── components/AccountForms.tsx, src/return-path.ts   # forms, safe ?depois= redirect
 └── src/i18n/{pt,en}.ts
-tests/contract/accounts.test.ts, admin-accounts.test.ts (+ ballot/detail additions for account callers)
+tests/contract/accounts.test.ts, admin-accounts.test.ts, no-voter-identity.test.ts (account case)
 apps/web/tests/e2e/accounts.spec.ts
 docs/adr/ADR-012-optional-voter-accounts.md (done)
 ```

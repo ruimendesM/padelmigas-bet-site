@@ -17,8 +17,44 @@ export const en: Messages = {
       admin: 'Organiser',
     },
     footer: {
-      note: 'Anonymous voting. One ballot per group, per device.',
+      note: 'Anonymous voting. One ballot per group, per device — or per account, if you sign in.',
     },
+  },
+
+  account: {
+    signIn: 'Sign in',
+    register: 'Register',
+    signOut: 'Sign out',
+    myAccount: 'My account',
+    username: 'Username',
+    usernameHint: '3 to 30 characters: lower-case letters, digits, dot, hyphen or underscore.',
+    password: 'Password',
+    passwordHint: 'At least 8 characters.',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    registerTitle: 'Create an account',
+    registerIntro:
+      'With an account, your vote follows you to any device you sign in on. No email needed — and voting still needs no account.',
+    registerSubmit: 'Create account',
+    registering: 'Creating…',
+    haveAccount: 'Already have an account?',
+    signInTitle: 'Sign in',
+    signInIntro:
+      "Votes you cast on this device while signed out move to your account. Where the account already voted in a group, the account's vote stays.",
+    signInSubmit: 'Sign in',
+    signingIn: 'Signing in…',
+    noAccount: "Don't have an account yet?",
+    temporaryPasswordNotice: 'You are using a temporary password. Choose a new one to continue.',
+    temporaryPasswordSubmit: 'Save and sign in',
+    forgotPassword: 'Forgot your password? Ask the organiser to reset it.',
+    accountTitle: 'My account',
+    signedInAs: (username: string) => `Signed in as ${username}.`,
+    changePasswordHeading: 'Change password',
+    changePasswordSubmit: 'Change password',
+    changingPassword: 'Changing…',
+    passwordChanged: 'Password changed. Other devices have been signed out.',
+    signingOut: 'Signing out…',
+    voteHint: 'Sign in to keep your vote on any device.',
   },
 
   common: {
@@ -166,6 +202,24 @@ export const en: Messages = {
     replace: 'Replace tournament',
     replacing: 'Replacing…',
     replaced: 'Tournament replaced. The previous one is now marked invalidated.',
+
+    accountsHeading: 'Voter accounts',
+    accountsHint: 'Find an account by username to reset the password of someone who forgot it.',
+    accountsSearch: 'Search',
+    accountsSearching: 'Searching…',
+    accountsQuery: 'Username',
+    accountsNone: 'No accounts found.',
+    accountsCreated: 'Created',
+    accountsPending: 'Unused temporary password',
+    accountsReset: 'Reset password',
+    accountsResetting: 'Resetting…',
+    accountsResetConfirm: (username: string) =>
+      `Reset ${username}'s password? They will be signed out on every device.`,
+    accountsTemporaryHeading: (username: string) => `Temporary password for ${username}`,
+    accountsTemporaryHint: (expiresAt: string) =>
+      `Shown only now. Send it to them: it works once to sign in and choose a new one, until ${expiresAt}.`,
+    accountsCopy: 'Copy',
+    accountsCopied: 'Copied',
     warningODD_ROW_COUNT:
       'An odd number of pairs was read. Check whether a row is missing or extra.',
   },
@@ -197,6 +251,9 @@ export const en: Messages = {
     EXTRACTION_UNAVAILABLE: 'Image reading is not configured. Enter the lineup by hand.',
     EXTRACTION_FAILED:
       'The image could not be read. Try another image, or enter the lineup by hand.',
+    USERNAME_TAKEN: 'That username is taken. Choose another.',
+    INVALID_CREDENTIALS: 'Wrong username or password.',
+    PASSWORD_CHANGE_REQUIRED: 'This password is temporary. Choose a new one to continue.',
     NETWORK_ERROR: 'Could not reach the server.',
   },
 };

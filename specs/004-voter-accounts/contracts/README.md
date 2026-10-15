@@ -42,7 +42,8 @@ All changes are additive under `/api/v1` (Principle III). Schemas live in
 
 ## `DELETE /account/session` — `signOut`
 
-- Auth: none required (idempotent). 204. Clears `pm_account` and `pm_voter` (FR-316).
+- Auth: none required (idempotent). 200 `{ signedOut: true }`. Clears `pm_account` and `pm_voter`
+  (FR-316).
 
 ## `PUT /account/password` — `changePassword`
 
