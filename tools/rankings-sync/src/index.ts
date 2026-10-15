@@ -35,10 +35,23 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): RankingsSyn
   return { databaseUrl, rankingsCsvUrl };
 }
 
+/**
+ * The sync never touches accounts, so it carries no argon2 native module: a hasher that refuses is
+ * enough to satisfy `Deps`, and fails loudly if a future change ever routes an account call here.
+ */
+const noPasswordHasher: Deps['passwords'] = {
+  hash: () => Promise.reject(new Error('Password hashing is not available in the rankings sync.')),
+  verify: () =>
+    Promise.reject(new Error('Password hashing is not available in the rankings sync.')),
+};
+
 export function buildDeps(config: RankingsSyncConfig): Deps {
-  return createRepositories(getSql({ connectionString: config.databaseUrl }), {
-    rankingsCsvUrl: config.rankingsCsvUrl,
-  });
+  return {
+    ...createRepositories(getSql({ connectionString: config.databaseUrl }), {
+      rankingsCsvUrl: config.rankingsCsvUrl,
+    }),
+    passwords: noPasswordHasher,
+  };
 }
 
 /** Runs the import against an already-assembled container. Kept separate so a test can pass fakes. */

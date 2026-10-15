@@ -24,6 +24,8 @@ tags:
     description: Anonymous visitors. A voter cookie may be present.
   - name: admin
     description: Organiser only.
+  - name: account
+    description: Optional voter accounts (feature 004). Voting never requires one.
 paths:
   /tournaments:
     get:
@@ -2185,6 +2187,406 @@ paths:
       security:
         - organiserSession: []
         - cronSecret: []
+  /account:
+    post:
+      operationId: register
+      tags:
+        - account
+      summary: Create a voter account and sign in on this device
+      description: "Requirements: FR-303, FR-304, FR-305, FR-307, FR-309, FR-317."
+      responses:
+        "201":
+          description: Create a voter account and sign in on this device
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                    required:
+                      - username
+                    additionalProperties: false
+                required:
+                  - account
+                additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "409":
+          description: "`USERNAME_TAKEN`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "429":
+          description: "`RATE_LIMITED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: ^[a-z0-9._-]{3,30}$
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - username
+                - password
+              additionalProperties: false
+    get:
+      operationId: getAccount
+      tags:
+        - account
+      summary: The signed-in account on this device
+      description: "Requirements: FR-322."
+      responses:
+        "200":
+          description: The signed-in account on this device
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                    required:
+                      - username
+                    additionalProperties: false
+                required:
+                  - account
+                additionalProperties: false
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - accountSession: []
+  /account/session:
+    post:
+      operationId: signIn
+      tags:
+        - account
+      summary: Sign in, merging this device's logged-out ballots into the account, and set a new password
+        after a reset
+      description: "Requirements: FR-310, FR-311, FR-312, FR-313, FR-314, FR-317, FR-321."
+      responses:
+        "200":
+          description: Sign in, merging this device's logged-out ballots into the account, and set a new
+            password after a reset
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                    required:
+                      - username
+                    additionalProperties: false
+                required:
+                  - account
+                additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`INVALID_CREDENTIALS`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "`PASSWORD_CHANGE_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: "`RATE_LIMITED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - username
+                - password
+              additionalProperties: false
+    delete:
+      operationId: signOut
+      tags:
+        - account
+      summary: Sign out and return this device to a new logged-out visitor
+      description: "Requirements: FR-316."
+      responses:
+        "200":
+          description: Sign out and return this device to a new logged-out visitor
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedOut:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - signedOut
+                additionalProperties: false
+  /account/password:
+    put:
+      operationId: changePassword
+      tags:
+        - account
+      summary: Change the password, signing out every other device
+      description: "Requirements: FR-318."
+      responses:
+        "200":
+          description: Change the password, signing out every other device
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                    required:
+                      - username
+                    additionalProperties: false
+                required:
+                  - account
+                additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`INVALID_CREDENTIALS` | `UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - currentPassword
+                - newPassword
+              additionalProperties: false
+      security:
+        - accountSession: []
+  /admin/accounts:
+    get:
+      operationId: searchAccounts
+      tags:
+        - admin
+      summary: Find voter accounts by part of a username
+      description: "Requirements: FR-319."
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 30
+      responses:
+        "200":
+          description: Find voter accounts by part of a username
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        username:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        temporaryPasswordPending:
+                          type: boolean
+                      required:
+                        - id
+                        - username
+                        - createdAt
+                        - temporaryPasswordPending
+                      additionalProperties: false
+                required:
+                  - accounts
+                additionalProperties: false
+        "400":
+          description: "`MALFORMED_PAYLOAD`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+      security:
+        - organiserSession: []
+  /admin/accounts/{accountId}/password-reset:
+    post:
+      operationId: resetAccountPassword
+      tags:
+        - admin
+      summary: Issue a one-time temporary password and sign the account out everywhere
+      description: "Requirements: FR-319, FR-320."
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Issue a one-time temporary password and sign the account out everywhere
+          headers:
+            Cache-Control:
+              description: "Always `no-store`: this response depends on who is asking, and a cached reveal would
+                leak results to a visitor who has not voted (SC-006, Risk R1)."
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  temporaryPassword:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                required:
+                  - temporaryPassword
+                  - expiresAt
+                additionalProperties: false
+        "401":
+          description: "`UNAUTHORISED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+        "404":
+          description: "`NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithIssues"
+      security:
+        - organiserSession: []
 components:
   securitySchemes:
     organiserSession:
@@ -2192,6 +2594,12 @@ components:
       in: cookie
       name: pm_admin
       description: Server-signed organiser session cookie; the anonymous public never holds one.
+    accountSession:
+      type: apiKey
+      in: cookie
+      name: pm_account
+      description: "Server-signed voter-account session cookie. Optional: logged-out visitors vote with
+        the anonymous voter cookie instead (ADR-012)."
     cronSecret:
       type: http
       scheme: bearer
@@ -2228,6 +2636,9 @@ components:
             - ALREADY_VOTED
             - VOTING_CLOSED
             - RESULTS_HIDDEN
+            - USERNAME_TAKEN
+            - INVALID_CREDENTIALS
+            - PASSWORD_CHANGE_REQUIRED
         message:
           type: string
       required:
@@ -2264,6 +2675,9 @@ components:
             - ALREADY_VOTED
             - VOTING_CLOSED
             - RESULTS_HIDDEN
+            - USERNAME_TAKEN
+            - INVALID_CREDENTIALS
+            - PASSWORD_CHANGE_REQUIRED
         message:
           type: string
         issues:

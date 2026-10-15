@@ -1,4 +1,5 @@
 import type {
+  AccountId,
   ExternalPlayerId,
   GroupId,
   PairId,
@@ -7,6 +8,7 @@ import type {
   VoterId,
 } from '@padelmigas/contracts/common';
 import type {
+  Account,
   Appearance,
   Ballot,
   BallotEntry,
@@ -241,6 +243,97 @@ export interface VoterRepository {
    * Best-effort by design: a failure here must never fail the request the voter actually made.
    */
   touch(id: VoterId): Promise<void>;
+
+  /**
+   * Whether an account owns this voter (feature 004).
+   *
+   * An owned voter is reachable only through a valid account session: a bare voter cookie carrying
+   * its id is treated as unrecognised, which is what makes sign-out and resets end a device's access
+   * to the account's ballots (research R4).
+   */
+  isOwned(id: VoterId): Promise<boolean>;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Voter accounts (feature 004)
+// ---------------------------------------------------------------------------------------------
+
+export interface AccountCreate {
+  readonly username: string;
+  readonly passwordHash: string;
+  /**
+   * The device's current anonymous voter, adopted only if no account owns it (FR-309, FR-313);
+   * otherwise, or when null, a new voter is minted for the account.
+   */
+  readonly adoptVoterId: VoterId | null;
+}
+
+export type AccountCreateOutcome =
+  { readonly kind: 'created'; readonly account: Account } | { readonly kind: 'username-taken' };
+
+export interface AccountCredentials {
+  readonly account: Account;
+  readonly passwordHash: string;
+}
+
+export interface DeviceMergeInput {
+  readonly accountVoterId: VoterId;
+  readonly deviceVoterId: VoterId;
+  /** Server time, for deciding which device ballots sit in open groups (FR-311). */
+  readonly now: Date;
+}
+
+export interface DeviceMergeOutcome {
+  readonly moved: number;
+  readonly discarded: number;
+  readonly left: number;
+}
+
+export interface AccountRepository {
+  /** Inserts the account, and its voter when one is minted, in ONE transaction. */
+  create(input: AccountCreate): Promise<AccountCreateOutcome>;
+
+  findById(id: AccountId): Promise<Account | null>;
+
+  /** The only read that returns the hash; used by sign-in and password change alone (FR-306). */
+  findCredentialsById(id: AccountId): Promise<AccountCredentials | null>;
+  findCredentialsByUsername(username: string): Promise<AccountCredentials | null>;
+
+  /** Case-insensitive substring match on username, newest first, at most `limit` rows (FR-319). */
+  search(query: string, limit: number): Promise<readonly Account[]>;
+
+  /**
+   * Replaces the password with a permanent one: clears any temporary-password expiry and bumps the
+   * session version, so every other session ends (FR-318, FR-321).
+   */
+  setPassword(id: AccountId, passwordHash: string, now: Date): Promise<Account>;
+
+  /**
+   * Stores an organiser-issued temporary password expiring at `expiresAt` and bumps the session
+   * version, ending every existing session (FR-320). `null` when the account does not exist.
+   */
+  resetPassword(
+    id: AccountId,
+    temporaryPasswordHash: string,
+    expiresAt: Date,
+    now: Date,
+  ): Promise<Account | null>;
+
+  /**
+   * Merges an unowned device voter's ballots into the account's voter, in ONE transaction (FR-312).
+   *
+   * Applies `core/accounts.planDeviceMerge`: moves ballots in groups the account has not voted in,
+   * deletes the device's ballot on an open-group conflict, and leaves closed-group conflicts alone.
+   * Does nothing when the device voter is owned by any account (FR-313).
+   */
+  mergeDeviceVoter(input: DeviceMergeInput): Promise<DeviceMergeOutcome>;
+}
+
+/** Password hashing, implemented by the host (argon2id) so core and api stay native-free (R7). */
+export interface PasswordHasher {
+  hash(plain: string): Promise<string>;
+  /** `false` for a wrong password and for a malformed hash alike. */
+  verify(hash: string, plain: string): Promise<boolean>;
 }
 
 /** A validated ballot ready to store. Ids are assigned by the store. */

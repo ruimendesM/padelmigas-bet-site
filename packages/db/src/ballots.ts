@@ -62,6 +62,11 @@ export function createVoterRepository(sql: Sql): VoterRepository {
         console.warn('Failed to refresh voter last_seen_at; continuing.', error);
       }
     },
+
+    async isOwned(id) {
+      const rows = await sql<Row[]>`select 1 from accounts where voter_id = ${id}`;
+      return rows.length > 0;
+    },
   };
 }
 

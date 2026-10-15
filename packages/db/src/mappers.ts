@@ -1,4 +1,5 @@
 import type {
+  Account,
   Appearance,
   Ballot,
   BallotEntry,
@@ -158,6 +159,18 @@ export function toPair(row: Row): Pair {
     members: [first, second],
     totalPoints: num(row, 'total_points'),
     seed: num(row, 'seed'),
+  };
+}
+
+/** Never reads `password_hash`, even when the row carries it (FR-306). */
+export function toAccount(row: Row): Account {
+  return {
+    id: id(row, 'id'),
+    username: str(row, 'username'),
+    voterId: id(row, 'voter_id'),
+    sessionVersion: num(row, 'session_version'),
+    temporaryPasswordExpiresAt: instantOrNull(row, 'temporary_password_expires_at'),
+    createdAt: instant(row, 'created_at'),
   };
 }
 

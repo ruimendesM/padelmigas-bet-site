@@ -75,6 +75,7 @@ export default tseslint.config(
       // exclusively by core/window from the injected Clock (SC-007).
       'apps/web/src/server/admin-auth.ts',
       'apps/web/src/server/voter-cookie.ts',
+      'apps/web/src/server/account-session.ts',
     ],
     rules: { 'no-restricted-syntax': 'off', 'no-console': 'off' },
   },

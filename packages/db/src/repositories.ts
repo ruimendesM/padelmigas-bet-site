@@ -1,4 +1,5 @@
 import type {
+  AccountRepository,
   BallotRepository,
   Clock,
   GroupRepository,
@@ -11,6 +12,7 @@ import type {
   TournamentRepository,
   VoterRepository,
 } from '@padelmigas/core';
+import { createAccountRepository } from './accounts.js';
 import { createBallotRepository, createVoterRepository } from './ballots.js';
 import type { Sql } from './client.js';
 import { systemClock } from './clock.js';
@@ -42,6 +44,7 @@ export interface Repositories {
   readonly results: ResultsRepository;
   readonly history: HistoryRepository;
   readonly rankings: RankingSource;
+  readonly accounts: AccountRepository;
 }
 
 export interface RepositoriesConfig {
@@ -64,5 +67,6 @@ export function createRepositories(sql: Sql, config: RepositoriesConfig): Reposi
     results: createResultsRepository(sql),
     history: createHistoryRepository(sql),
     rankings: createRankingSource(sql, { csvUrl: config.rankingsCsvUrl, clock }),
+    accounts: createAccountRepository(sql),
   };
 }

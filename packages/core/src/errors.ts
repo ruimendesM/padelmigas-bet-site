@@ -89,6 +89,11 @@ export const HTTP_STATUS_BY_CODE: Readonly<Record<ErrorCode, number>> = {
 
   // Reading results
   RESULTS_HIDDEN: 403,
+
+  // Voter accounts (feature 004)
+  USERNAME_TAKEN: 409,
+  INVALID_CREDENTIALS: 401,
+  PASSWORD_CHANGE_REQUIRED: 403,
 };
 
 export function httpStatusFor(code: ErrorCode): number {

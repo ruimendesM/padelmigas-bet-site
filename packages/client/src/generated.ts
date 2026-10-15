@@ -5,7 +5,7 @@
 // packages/contracts/src/endpoints.ts; editing this file by hand is overwritten on the next run and
 // silently breaks the guarantee that every client speaks the same contract (Principle III).
 //
-// Generated 11 operations.
+// Generated 18 operations.
 
 import type { z } from 'zod';
 import * as contracts from '@padelmigas/contracts';
@@ -30,6 +30,17 @@ export namespace C {
   export type ReplaceTournamentResponse = z.output<(typeof contracts.ENDPOINTS)[9]['response']>;
   export type ReplaceTournamentBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[9]['body']>>;
   export type SyncRankingsResponse = z.output<(typeof contracts.ENDPOINTS)[10]['response']>;
+  export type RegisterResponse = z.output<(typeof contracts.ENDPOINTS)[11]['response']>;
+  export type RegisterBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[11]['body']>>;
+  export type GetAccountResponse = z.output<(typeof contracts.ENDPOINTS)[12]['response']>;
+  export type SignInResponse = z.output<(typeof contracts.ENDPOINTS)[13]['response']>;
+  export type SignInBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[13]['body']>>;
+  export type SignOutResponse = z.output<(typeof contracts.ENDPOINTS)[14]['response']>;
+  export type ChangePasswordResponse = z.output<(typeof contracts.ENDPOINTS)[15]['response']>;
+  export type ChangePasswordBody = z.input<NonNullable<(typeof contracts.ENDPOINTS)[15]['body']>>;
+  export type SearchAccountsResponse = z.output<(typeof contracts.ENDPOINTS)[16]['response']>;
+  export type SearchAccountsQuery = z.input<NonNullable<(typeof contracts.ENDPOINTS)[16]['query']>>;
+  export type ResetAccountPasswordResponse = z.output<(typeof contracts.ENDPOINTS)[17]['response']>;
 }
 
 export interface ClientConfig {
@@ -308,6 +319,121 @@ export function createClient(config: ClientConfig) {
       url,
       voterDependent: false,
     }) as Promise<C.SyncRankingsResponse>;
+  },
+  /**
+   * Create a voter account and sign in on this device.
+   *
+   * `POST /api/v1/account` — FR-303, FR-304, FR-305, FR-307, FR-309, FR-317.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: MALFORMED_PAYLOAD, USERNAME_TAKEN, RATE_LIMITED.
+   */
+  async register(params: { body: C.RegisterBody }): Promise<C.RegisterResponse> {
+    const path = `/account`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      body: params.body,
+      voterDependent: true,
+    }) as Promise<C.RegisterResponse>;
+  },
+  /**
+   * The signed-in account on this device.
+   *
+   * `GET /api/v1/account` — FR-322.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: UNAUTHORISED.
+   */
+  async getAccount(_params?: undefined): Promise<C.GetAccountResponse> {
+    const path = '/account';
+    const url = path;
+    return request(config, {
+      method: 'GET',
+      url,
+      voterDependent: true,
+    }) as Promise<C.GetAccountResponse>;
+  },
+  /**
+   * Sign in, merging this device's logged-out ballots into the account, and set a new password after a reset.
+   *
+   * `POST /api/v1/account/session` — FR-310, FR-311, FR-312, FR-313, FR-314, FR-317, FR-321.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: MALFORMED_PAYLOAD, INVALID_CREDENTIALS, PASSWORD_CHANGE_REQUIRED, RATE_LIMITED.
+   */
+  async signIn(params: { body: C.SignInBody }): Promise<C.SignInResponse> {
+    const path = `/account/session`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      body: params.body,
+      voterDependent: true,
+    }) as Promise<C.SignInResponse>;
+  },
+  /**
+   * Sign out and return this device to a new logged-out visitor.
+   *
+   * `DELETE /api/v1/account/session` — FR-316.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: .
+   */
+  async signOut(_params?: undefined): Promise<C.SignOutResponse> {
+    const path = '/account/session';
+    const url = path;
+    return request(config, {
+      method: 'DELETE',
+      url,
+      voterDependent: true,
+    }) as Promise<C.SignOutResponse>;
+  },
+  /**
+   * Change the password, signing out every other device.
+   *
+   * `PUT /api/v1/account/password` — FR-318.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: MALFORMED_PAYLOAD, INVALID_CREDENTIALS, UNAUTHORISED.
+   */
+  async changePassword(params: { body: C.ChangePasswordBody }): Promise<C.ChangePasswordResponse> {
+    const path = `/account/password`;
+    const url = path;
+    return request(config, {
+      method: 'PUT',
+      url,
+      body: params.body,
+      voterDependent: true,
+    }) as Promise<C.ChangePasswordResponse>;
+  },
+  /**
+   * Find voter accounts by part of a username.
+   *
+   * `GET /api/v1/admin/accounts` — FR-319.
+   * Documented failures: MALFORMED_PAYLOAD, UNAUTHORISED.
+   */
+  async searchAccounts(params: { query?: C.SearchAccountsQuery }): Promise<C.SearchAccountsResponse> {
+    const path = `/admin/accounts`;
+    const search = toSearchParams(params.query);
+    const url = search ? `${path}?${search}` : path;
+    return request(config, {
+      method: 'GET',
+      url,
+      voterDependent: false,
+    }) as Promise<C.SearchAccountsResponse>;
+  },
+  /**
+   * Issue a one-time temporary password and sign the account out everywhere.
+   *
+   * `POST /api/v1/admin/accounts/{accountId}/password-reset` — FR-319, FR-320.
+   * Voter-dependent: the server sends `no-store` and this call is never cached.
+   * Documented failures: NOT_FOUND, UNAUTHORISED.
+   */
+  async resetAccountPassword(params: { accountId: string }): Promise<C.ResetAccountPasswordResponse> {
+    const path = `/admin/accounts/${encodeURIComponent(String(params.accountId))}/password-reset`;
+    const url = path;
+    return request(config, {
+      method: 'POST',
+      url,
+      voterDependent: true,
+    }) as Promise<C.ResetAccountPasswordResponse>;
   },
   };
 }

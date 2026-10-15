@@ -6,13 +6,15 @@ import {
   type CallerContext,
 } from '@padelmigas/api';
 import type {
+  AccountDto,
   PlayerDetailDto,
   TournamentDetailDto,
   TournamentListResponse,
 } from '@padelmigas/contracts';
 import type { PlayerId } from '@padelmigas/contracts/common';
 import { getDeps } from './deps.js';
-import { VOTER_COOKIE_NAME, readVoterIdFromToken } from './voter-cookie.js';
+import { ACCOUNT_COOKIE_NAME } from './account-session.js';
+import { VOTER_COOKIE_NAME, resolveCaller, type ResolvedCaller } from './voter-cookie.js';
 
 /**
  * Server-component reads.
@@ -26,11 +28,33 @@ import { VOTER_COOKIE_NAME, readVoterIdFromToken } from './voter-cookie.js';
  * cookie, and a statically rendered reveal is Risk R1.
  */
 
-/** The caller as the handlers understand them. Reads never mint an identity — see `voter-cookie`. */
-export async function caller(): Promise<CallerContext> {
+async function resolvedCaller(): Promise<ResolvedCaller> {
   const store = await cookies();
-  const token = store.get(VOTER_COOKIE_NAME)?.value ?? null;
-  return { voterId: await readVoterIdFromToken(token) };
+  return resolveCaller(
+    {
+      voter: store.get(VOTER_COOKIE_NAME)?.value ?? null,
+      account: store.get(ACCOUNT_COOKIE_NAME)?.value ?? null,
+    },
+    getDeps(),
+  );
+}
+
+/**
+ * The caller as the handlers understand them. Reads never mint an identity — see `voter-cookie`.
+ *
+ * Resolved exactly as the `/api/v1` routes resolve it (feature 004): a page that trusted a bare voter
+ * cookie for an account-owned voter would keep showing that account's ballots after sign-out.
+ */
+export async function caller(): Promise<CallerContext> {
+  return resolvedCaller();
+}
+
+/** The signed-in account for the header (FR-322), or `null` for a logged-out visitor. */
+export async function fetchSignedInAccount(): Promise<AccountDto | null> {
+  const { accountId } = await resolvedCaller();
+  if (!accountId) return null;
+  const account = await getDeps().accounts.findById(accountId);
+  return account ? { username: account.username } : null;
 }
 
 export async function fetchTournaments(

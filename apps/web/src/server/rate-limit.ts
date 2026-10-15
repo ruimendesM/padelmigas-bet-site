@@ -3,11 +3,12 @@ import { domainError } from '@padelmigas/core';
 import { serverEnv } from '../env.js';
 
 /**
- * Per-IP rate limiting for ballot submission (constitution: Privacy).
+ * Per-IP rate limiting for ballot submission and account sign-in (constitution: Privacy).
  *
- * **Window: 10 votes per 10 minutes per client.** Generous by design — a household or a club on one
- * NAT shares an address, and the limit exists to blunt a script, not to police a group of friends
- * sharing a phone hotspot at the courts.
+ * **Window: 10 per 10 minutes per client, per bucket.** Generous by design — a household or a club on
+ * one NAT shares an address, and the limit exists to blunt a script, not to police a group of friends
+ * sharing a phone hotspot at the courts. The `auth` bucket (feature 004, FR-317) is shared by register
+ * and sign-in and is separate from voting, so guessing passwords cannot cost anyone their vote.
  *
  * The privacy rules this file exists to keep:
  *  - The IP is **never stored**. It is salted with `RATE_LIMIT_SALT` and hashed; only the hash is
@@ -26,6 +27,14 @@ const LIMIT = 10;
 /** The window itself. */
 const WINDOW_MS = 10 * 60 * 1000;
 
+export type RateLimitBucket = 'ballot' | 'auth';
+
+/** What the visitor is told when a bucket is exhausted. */
+const EXHAUSTED_MESSAGE: Readonly<Record<RateLimitBucket, string>> = {
+  ballot: 'Demasiados votos em pouco tempo. Tenta daqui a pouco.',
+  auth: 'Demasiadas tentativas em pouco tempo. Tenta daqui a pouco.',
+};
+
 interface Bucket {
   count: number;
   /** Epoch milliseconds at which this bucket resets. */
@@ -40,8 +49,11 @@ const buckets = new Map<string, Bucket>();
  * The salt is a deployment secret, so the hashes cannot be reversed with a table of the whole IPv4
  * space — an unsalted hash of an IP is not an anonymisation, it is an encoding.
  */
-function keyFor(address: string): string {
-  return createHash('sha256').update(`${serverEnv().RATE_LIMIT_SALT}:${address}`).digest('hex');
+function keyFor(bucket: RateLimitBucket, address: string): string {
+  const digest = createHash('sha256')
+    .update(`${serverEnv().RATE_LIMIT_SALT}:${address}`)
+    .digest('hex');
+  return `${bucket}:${digest}`;
 }
 
 /**
@@ -70,8 +82,12 @@ export interface RateLimitDecision {
  * `now` is passed in rather than read here: `Clock` is the system's only source of time, and this
  * module is not it (SC-007).
  */
-export function consume(request: Request, now: Date): RateLimitDecision {
-  const key = keyFor(clientAddress(request));
+export function consume(
+  request: Request,
+  now: Date,
+  bucketName: RateLimitBucket = 'ballot',
+): RateLimitDecision {
+  const key = keyFor(bucketName, clientAddress(request));
   const nowMs = now.getTime();
 
   const bucket = buckets.get(key);
@@ -98,10 +114,14 @@ export function consume(request: Request, now: Date): RateLimitDecision {
 }
 
 /** Throws `RATE_LIMITED`, which the adapter maps to 429 with a `Retry-After`. */
-export function enforce(request: Request, now: Date): { readonly retryAfterSeconds: number } {
-  const decision = consume(request, now);
+export function enforce(
+  request: Request,
+  now: Date,
+  bucketName: RateLimitBucket = 'ballot',
+): { readonly retryAfterSeconds: number } {
+  const decision = consume(request, now, bucketName);
   if (!decision.allowed) {
-    throw domainError('RATE_LIMITED', 'Demasiados votos em pouco tempo. Tenta daqui a pouco.');
+    throw domainError('RATE_LIMITED', EXHAUSTED_MESSAGE[bucketName]);
   }
   return { retryAfterSeconds: decision.retryAfterSeconds };
 }
