@@ -8,6 +8,7 @@
 export { closeSharedSql, createSql, getSql } from './client.js';
 export type { DbConfig, Sql } from './client.js';
 export { fixedClock, systemClock } from './clock.js';
+export { createAccountRepository } from './accounts.js';
 export { createBallotRepository, createVoterRepository } from './ballots.js';
 export { createGroupRepository, createPairRepository } from './groups.js';
 export { createHistoryRepository } from './history.js';

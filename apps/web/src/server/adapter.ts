@@ -99,6 +99,14 @@ export async function respond<TInput, TOutput>(options: {
   readonly status?: number;
   /** Extra response headers, e.g. a freshly minted voter cookie. */
   readonly headers?: Readonly<Record<string, string>>;
+  /**
+   * Turns the handler's output into the wire body plus any cookies to set (feature 004: the account
+   * routes sign a session and clear the voter cookie, two `Set-Cookie` headers a header map cannot
+   * hold). Host plumbing only — signing a cookie is not business branching.
+   */
+  readonly present?: (
+    output: TOutput,
+  ) => Promise<{ readonly body: unknown; readonly cookies?: readonly string[] }>;
 }): Promise<NextResponse<TOutput | ErrorBody>> {
   let input: TInput;
   try {
@@ -116,10 +124,13 @@ export async function respond<TInput, TOutput>(options: {
 
   try {
     const output = await options.run(input, getDeps());
-    return NextResponse.json(output, {
+    const presented = options.present ? await options.present(output) : { body: output };
+    const response = NextResponse.json(presented.body as TOutput, {
       status: options.status ?? 200,
       headers: { ...NO_STORE_HEADERS, ...(options.headers ?? {}) },
     });
+    for (const cookie of presented.cookies ?? []) response.headers.append('Set-Cookie', cookie);
+    return response;
   } catch (error) {
     return toErrorResponse(error);
   }

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type postgres from 'postgres';
 import type { Deps } from '@padelmigas/api';
 import { createRepositories, createSql, fixedClock, type Sql } from '@padelmigas/db';
+import { argon2PasswordHasher } from '../../apps/web/src/server/password-hasher.js';
 import type { Clock } from '@padelmigas/core';
 
 /**
@@ -25,6 +26,7 @@ const TABLES_CHILD_FIRST = [
   'group_final_standings',
   'ballot_entries',
   'ballots',
+  'accounts',
   'voters',
   'pairs',
   'groups',
@@ -130,6 +132,7 @@ export function createTestDeps(options: { now?: Date } = {}): TestDeps {
 
   const deps: Deps = {
     ...base,
+    passwords: argon2PasswordHasher,
     rankings: {
       async fetchLatest() {
         ranking.fetchCount += 1;

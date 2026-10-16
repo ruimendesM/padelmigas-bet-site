@@ -10,4 +10,5 @@ export * from './tournaments.js';
 export * from './results.js';
 export * from './ballots.js';
 export * from './players.js';
+export * from './accounts.js';
 export * from './endpoints.js';

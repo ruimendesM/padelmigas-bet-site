@@ -55,8 +55,10 @@ test.describe('vote and reveal', () => {
       .first()
       .click();
 
-    // (2) SC-005: the payoff is immediate.
-    await expect(page.getByText(/votos?$/i).first()).toBeVisible({ timeout: 2000 });
+    // (2) SC-005: the payoff is immediate. Anchored on the results' ballot count ("com base em 1
+    // voto") — a bare /votos?$/ also matches the "Confirmar voto" button, passes before the ballot
+    // response lands, and lets the reload below cancel the request that carries the voter cookie.
+    await expect(page.getByText(/com base em \d+ votos?/i).first()).toBeVisible({ timeout: 2000 });
     expect(Date.now() - started).toBeLessThan(5000);
 
     // (3) FR-012 / FR-014: the identity and the reveal survive a full reload.

@@ -1,11 +1,13 @@
-import type { VoterId } from '@padelmigas/contracts/common';
+import type { AccountId, VoterId } from '@padelmigas/contracts/common';
 import type {
+  AccountRepository,
   BallotRepository,
   Clock,
   GroupRepository,
   HistoryRepository,
   LineupImageReader,
   PairRepository,
+  PasswordHasher,
   PlayerRepository,
   RankingSource,
   RatingRepository,
@@ -53,6 +55,10 @@ export interface Deps {
    * that needs it answers `EXTRACTION_UNAVAILABLE` (FR-119, FR-120, ADR-011).
    */
   readonly imageReader?: LineupImageReader;
+  /** Optional voter accounts (feature 004). */
+  readonly accounts: AccountRepository;
+  /** argon2id, implemented by the host so this package stays free of native modules (research R7). */
+  readonly passwords: PasswordHasher;
 }
 
 /**
@@ -75,6 +81,11 @@ export type NullaryHandler<TOutput> = (deps: Deps) => Promise<TOutput>;
  */
 export interface CallerContext {
   readonly voterId: VoterId | null;
+  /**
+   * The signed-in account, when the caller presented a valid account session (feature 004). When
+   * set, `voterId` is that account's voter. Never echoed either.
+   */
+  readonly accountId?: AccountId | null;
 }
 
 /**

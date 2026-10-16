@@ -15,8 +15,46 @@ export const pt = {
       admin: 'Organizador',
     },
     footer: {
-      note: 'Votação anónima. Um voto por grupo, por dispositivo.',
+      note: 'Votação anónima. Um voto por grupo, por dispositivo — ou por conta, se entrares.',
     },
+  },
+
+  // Optional voter accounts (feature 004)
+  account: {
+    signIn: 'Entrar',
+    register: 'Registar',
+    signOut: 'Sair',
+    myAccount: 'A minha conta',
+    username: 'Nome de utilizador',
+    usernameHint: '3 a 30 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.',
+    password: 'Palavra-passe',
+    passwordHint: 'Pelo menos 8 caracteres.',
+    currentPassword: 'Palavra-passe atual',
+    newPassword: 'Nova palavra-passe',
+    registerTitle: 'Criar conta',
+    registerIntro:
+      'Com uma conta, o teu voto fica guardado em qualquer dispositivo onde entres. Não é preciso email — e votar continua a não precisar de conta.',
+    registerSubmit: 'Criar conta',
+    registering: 'A criar…',
+    haveAccount: 'Já tens conta?',
+    signInTitle: 'Entrar',
+    signInIntro:
+      'Os votos que fizeste neste dispositivo sem sessão passam para a tua conta. Num grupo em que a conta já votou, fica o voto da conta.',
+    signInSubmit: 'Entrar',
+    signingIn: 'A entrar…',
+    noAccount: 'Ainda não tens conta?',
+    temporaryPasswordNotice:
+      'Estás a usar uma palavra-passe temporária. Escolhe uma nova para continuar.',
+    temporaryPasswordSubmit: 'Guardar e entrar',
+    forgotPassword: 'Esqueceste a palavra-passe? Pede ao organizador para a repor.',
+    accountTitle: 'A minha conta',
+    signedInAs: (username: string) => `Sessão iniciada como ${username}.`,
+    changePasswordHeading: 'Alterar palavra-passe',
+    changePasswordSubmit: 'Alterar palavra-passe',
+    changingPassword: 'A alterar…',
+    passwordChanged: 'Palavra-passe alterada. Os outros dispositivos terminaram a sessão.',
+    signingOut: 'A sair…',
+    voteHint: 'Entra para guardares o teu voto em qualquer dispositivo.',
   },
 
   common: {
@@ -169,6 +207,26 @@ export const pt = {
     replace: 'Substituir torneio',
     replacing: 'A substituir…',
     replaced: 'Torneio substituído. O anterior ficou marcado como invalidado.',
+
+    // Voter accounts (feature 004)
+    accountsHeading: 'Contas de votantes',
+    accountsHint:
+      'Procura uma conta pelo nome de utilizador para repor a palavra-passe de quem a esqueceu.',
+    accountsSearch: 'Procurar',
+    accountsSearching: 'A procurar…',
+    accountsQuery: 'Nome de utilizador',
+    accountsNone: 'Nenhuma conta encontrada.',
+    accountsCreated: 'Criada em',
+    accountsPending: 'Palavra-passe temporária por usar',
+    accountsReset: 'Repor palavra-passe',
+    accountsResetting: 'A repor…',
+    accountsResetConfirm: (username: string) =>
+      `Repor a palavra-passe de ${username}? A sessão termina em todos os dispositivos.`,
+    accountsTemporaryHeading: (username: string) => `Palavra-passe temporária de ${username}`,
+    accountsTemporaryHint: (expiresAt: string) =>
+      `Mostrada só agora. Envia-a à pessoa: serve uma vez para entrar e escolher uma nova, até ${expiresAt}.`,
+    accountsCopy: 'Copiar',
+    accountsCopied: 'Copiada',
   },
 
   errors: {
@@ -199,6 +257,9 @@ export const pt = {
       'A leitura de imagens não está configurada. Introduz o alinhamento à mão.',
     EXTRACTION_FAILED:
       'Não foi possível ler a imagem. Tenta outra imagem ou introduz o alinhamento à mão.',
+    USERNAME_TAKEN: 'Esse nome de utilizador já existe. Escolhe outro.',
+    INVALID_CREDENTIALS: 'Nome de utilizador ou palavra-passe incorretos.',
+    PASSWORD_CHANGE_REQUIRED: 'Esta palavra-passe é temporária. Escolhe uma nova para continuar.',
     NETWORK_ERROR: 'Não foi possível contactar o servidor.',
   },
 };

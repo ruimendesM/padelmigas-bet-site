@@ -25,6 +25,9 @@ export default defineConfig({
         // Added for feature 003: a group wrongly judged unchanged carries votes for pairs that will
         // not play; one wrongly judged changed silently discards every vote on it.
         'packages/core/src/replacement/**/*.ts',
+        // Added for feature 004: a wrong merge decision counts one person twice in a group or throws
+        // away a vote they cast; an expiry off by one keeps a leaked temporary password alive.
+        'packages/core/src/accounts/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/index.ts.map'],
       thresholds: {

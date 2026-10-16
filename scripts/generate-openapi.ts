@@ -93,6 +93,8 @@ function security(endpoint: EndpointDefinition): unknown[] | undefined {
     case 'organiser-or-cron':
       // Either credential is sufficient; OpenAPI expresses OR as separate array entries.
       return [{ organiserSession: [] }, { cronSecret: [] }];
+    case 'account':
+      return [{ accountSession: [] }];
   }
 }
 
@@ -194,6 +196,10 @@ function document(): JsonObject {
     tags: [
       { name: 'public', description: 'Anonymous visitors. A voter cookie may be present.' },
       { name: 'admin', description: 'Organiser only.' },
+      {
+        name: 'account',
+        description: 'Optional voter accounts (feature 004). Voting never requires one.',
+      },
     ],
     paths,
     components: {
@@ -204,6 +210,14 @@ function document(): JsonObject {
           name: 'pm_admin',
           description:
             'Server-signed organiser session cookie; the anonymous public never holds one.',
+        },
+        accountSession: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'pm_account',
+          description:
+            'Server-signed voter-account session cookie. Optional: logged-out visitors vote with ' +
+            'the anonymous voter cookie instead (ADR-012).',
         },
         cronSecret: {
           type: 'http',

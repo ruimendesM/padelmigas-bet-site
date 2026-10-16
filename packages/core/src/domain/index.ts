@@ -1,4 +1,5 @@
 import type {
+  AccountId,
   BallotId,
   ExternalPlayerId,
   GroupId,
@@ -93,6 +94,23 @@ export interface Voter {
   readonly id: VoterId;
   readonly createdAt: Date;
   readonly lastSeenAt: Date;
+}
+
+/**
+ * An optional voter account (feature 004, ADR-012): a username that owns exactly one voter.
+ *
+ * The password hash is deliberately absent — only `AccountRepository.findCredentialsByUsername`
+ * returns it, so no code path that builds a response can reach it (FR-306).
+ */
+export interface Account {
+  readonly id: AccountId;
+  readonly username: string;
+  readonly voterId: VoterId;
+  /** Bumped on password change and reset; a session token with an older value is dead (FR-318). */
+  readonly sessionVersion: number;
+  /** Non-null while an organiser-issued temporary password awaits replacement (FR-320, FR-321). */
+  readonly temporaryPasswordExpiresAt: Date | null;
+  readonly createdAt: Date;
 }
 
 /** One pair placed at one position. */

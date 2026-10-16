@@ -21,6 +21,21 @@ export { getGroupResults } from './handlers/get-group-results.js';
 export type { GroupResultsInput } from './handlers/get-group-results.js';
 export { getPlayer } from './handlers/get-player.js';
 export {
+  changePassword,
+  getAccount,
+  register,
+  resetAccountPassword,
+  searchAccounts,
+  signIn,
+} from './handlers/accounts.js';
+export type {
+  ChangePasswordInput,
+  GetAccountInput,
+  RegisterInput,
+  SessionGrant,
+  SignInInput,
+} from './handlers/accounts.js';
+export {
   toGroupDto,
   toGroupResultsDto,
   toOwnBallotDto,

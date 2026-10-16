@@ -17,3 +17,4 @@ export * from './ballot/index.js';
 export * from './scoring/index.js';
 export * from './reveal/index.js';
 export * from './replacement/index.js';
+export * from './accounts/index.js';

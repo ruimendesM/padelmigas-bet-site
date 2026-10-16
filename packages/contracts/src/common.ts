@@ -21,6 +21,7 @@ export const pairId = z.string().uuid().brand<'PairId'>();
 export const playerId = z.string().uuid().brand<'PlayerId'>();
 export const voterId = z.string().uuid().brand<'VoterId'>();
 export const ballotId = z.string().uuid().brand<'BallotId'>();
+export const accountId = z.string().uuid().brand<'AccountId'>();
 
 export type TournamentId = z.infer<typeof tournamentId>;
 export type GroupId = z.infer<typeof groupId>;
@@ -28,6 +29,7 @@ export type PairId = z.infer<typeof pairId>;
 export type PlayerId = z.infer<typeof playerId>;
 export type VoterId = z.infer<typeof voterId>;
 export type BallotId = z.infer<typeof ballotId>;
+export type AccountId = z.infer<typeof accountId>;
 
 /** The ranking sheet's `ID` column — the canonical external player identity (FR-004, ADR-007). */
 export const externalPlayerId = z.number().int().positive();
@@ -78,6 +80,11 @@ export const ERROR_CODES = [
 
   // Reading results (FR-020, FR-021)
   'RESULTS_HIDDEN',
+
+  // Voter accounts (feature 004, FR-303, FR-314, FR-321)
+  'USERNAME_TAKEN',
+  'INVALID_CREDENTIALS',
+  'PASSWORD_CHANGE_REQUIRED',
 ] as const;
 
 export const errorCode = z.enum(ERROR_CODES);

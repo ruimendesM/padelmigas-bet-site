@@ -1,6 +1,16 @@
 import type { z } from 'zod';
 import { apiError, apiErrorWithIssues, type ErrorCode } from './common.js';
 import { ballotSubmission, castBallotResponse, tournamentDetail } from './ballots.js';
+import {
+  accountResponse,
+  accountSearchQuery,
+  accountSearchResponse,
+  changePasswordRequest,
+  passwordResetResponse,
+  registerRequest,
+  signInRequest,
+  signOutResponse,
+} from './accounts.js';
 import { playerDetail } from './players.js';
 import { groupResults } from './results.js';
 import {
@@ -26,7 +36,7 @@ import {
  * Adding an endpoint means adding an entry here. Forgetting to is caught by `pnpm openapi:check`.
  */
 
-export type HttpMethod = 'GET' | 'POST';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 /** Who may call an endpoint. Mirrors contracts/README rule 7 exactly. */
 export type AuthMode =
@@ -35,7 +45,9 @@ export type AuthMode =
   /** Requires the signed organiser session cookie. */
   | 'organiser'
   /** Organiser session OR bearer CRON_SECRET — accepted by the rankings-sync route alone. */
-  | 'organiser-or-cron';
+  | 'organiser-or-cron'
+  /** Requires the signed voter-account session cookie (feature 004). */
+  | 'account';
 
 export interface EndpointDefinition {
   readonly operationId: string;
@@ -44,7 +56,7 @@ export interface EndpointDefinition {
   readonly path: string;
   readonly summary: string;
   readonly auth: AuthMode;
-  readonly tag: 'public' | 'admin';
+  readonly tag: 'public' | 'admin' | 'account';
   /** Path parameter names, in order of appearance. */
   readonly pathParams: readonly string[];
   readonly query?: z.ZodTypeAny;
@@ -301,6 +313,116 @@ export const ENDPOINTS = [
     errors: ['DUPLICATE_MATCH_KEY', 'MALFORMED_PAYLOAD', 'UNAUTHORISED'],
     voterDependent: false,
     requirements: ['FR-004', 'FR-007', 'FR-027'],
+  },
+  {
+    operationId: 'register',
+    method: 'POST',
+    path: '/account',
+    summary: 'Create a voter account and sign in on this device',
+    auth: 'public',
+    tag: 'account',
+    pathParams: [],
+    body: registerRequest,
+    response: accountResponse,
+    successStatus: 201,
+    errors: ['MALFORMED_PAYLOAD', 'USERNAME_TAKEN', 'RATE_LIMITED', 'UNAUTHORISED'],
+    voterDependent: true,
+    requirements: ['FR-303', 'FR-304', 'FR-305', 'FR-307', 'FR-309', 'FR-317'],
+  },
+  {
+    operationId: 'getAccount',
+    method: 'GET',
+    path: '/account',
+    summary: 'The signed-in account on this device',
+    auth: 'account',
+    tag: 'account',
+    pathParams: [],
+    response: accountResponse,
+    successStatus: 200,
+    errors: ['UNAUTHORISED'],
+    voterDependent: true,
+    requirements: ['FR-322'],
+  },
+  {
+    operationId: 'signIn',
+    method: 'POST',
+    path: '/account/session',
+    summary:
+      "Sign in, merging this device's logged-out ballots into the account, and set a new password after a reset",
+    auth: 'public',
+    tag: 'account',
+    pathParams: [],
+    body: signInRequest,
+    response: accountResponse,
+    successStatus: 200,
+    errors: [
+      'MALFORMED_PAYLOAD',
+      'INVALID_CREDENTIALS',
+      'PASSWORD_CHANGE_REQUIRED',
+      'RATE_LIMITED',
+      'UNAUTHORISED',
+    ],
+    voterDependent: true,
+    requirements: ['FR-310', 'FR-311', 'FR-312', 'FR-313', 'FR-314', 'FR-317', 'FR-321'],
+  },
+  {
+    operationId: 'signOut',
+    method: 'DELETE',
+    path: '/account/session',
+    summary: 'Sign out and return this device to a new logged-out visitor',
+    auth: 'public',
+    tag: 'account',
+    pathParams: [],
+    response: signOutResponse,
+    successStatus: 200,
+    errors: [],
+    voterDependent: true,
+    requirements: ['FR-316'],
+  },
+  {
+    operationId: 'changePassword',
+    method: 'PUT',
+    path: '/account/password',
+    summary: 'Change the password, signing out every other device',
+    auth: 'account',
+    tag: 'account',
+    pathParams: [],
+    body: changePasswordRequest,
+    response: accountResponse,
+    successStatus: 200,
+    errors: ['MALFORMED_PAYLOAD', 'INVALID_CREDENTIALS', 'UNAUTHORISED'],
+    voterDependent: true,
+    requirements: ['FR-318'],
+  },
+  {
+    operationId: 'searchAccounts',
+    method: 'GET',
+    path: '/admin/accounts',
+    summary: 'Find voter accounts by part of a username',
+    auth: 'organiser',
+    tag: 'admin',
+    pathParams: [],
+    query: accountSearchQuery,
+    response: accountSearchResponse,
+    successStatus: 200,
+    errors: ['MALFORMED_PAYLOAD', 'UNAUTHORISED'],
+    voterDependent: false,
+    requirements: ['FR-319'],
+  },
+  {
+    operationId: 'resetAccountPassword',
+    method: 'POST',
+    path: '/admin/accounts/{accountId}/password-reset',
+    summary: 'Issue a one-time temporary password and sign the account out everywhere',
+    auth: 'organiser',
+    tag: 'admin',
+    pathParams: ['accountId'],
+    response: passwordResetResponse,
+    successStatus: 201,
+    errors: ['NOT_FOUND', 'UNAUTHORISED'],
+    // Not voter-dependent, but the body is a secret shown once: never cache it.
+    voterDependent: true,
+    requirements: ['FR-319', 'FR-320'],
   },
 ] as const satisfies readonly EndpointDefinition[];
 
