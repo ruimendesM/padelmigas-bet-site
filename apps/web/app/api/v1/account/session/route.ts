@@ -4,6 +4,7 @@ import { signIn } from '@padelmigas/api';
 import { jsonBody, respond } from '../../../../../src/server/adapter.js';
 import {
   enforceAuthRateLimit,
+  requireSameSiteJson,
   presentSession,
   signedOutCookies,
 } from '../../../../../src/server/account-routes.js';
@@ -19,6 +20,7 @@ import { deviceVoterId } from '../../../../../src/server/voter-cookie.js';
 export async function POST(request: Request): Promise<Response> {
   return respond({
     parse: async () => {
+      requireSameSiteJson(request);
       enforceAuthRateLimit(request);
       return {
         request: await jsonBody(request, signInRequest),

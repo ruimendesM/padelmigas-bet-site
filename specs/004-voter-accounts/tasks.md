@@ -111,6 +111,12 @@ flows.
 - [X] T044 Run all gates: `pnpm typecheck && pnpm lint && pnpm test:unit:coverage && pnpm test:contract && pnpm boundaries && pnpm openapi:check && pnpm migrations:check && pnpm migrations:verify-rollback`
 - [X] T045 Walk quickstart.md manually against `pnpm dev`, including scenarios 9–10 and the privacy spot-checks; mark spec Status `Implemented`
 
+## Phase 9: Analysis remediation (S1)
+
+- [X] T046 Add FR-324 and the two missing edge cases to `specs/004-voter-accounts/spec.md`; note the guard in `plan.md` and `contracts/README.md`
+- [X] T047 Implement `requireSameSiteJson` in `apps/web/src/server/account-routes.ts`, call it first in the register, sign-in and change-password routes, add `UNAUTHORISED` to their documented errors in `packages/contracts/src/endpoints.ts`, regenerate client + OpenAPI
+- [X] T048 Contract tests in `tests/contract/accounts.test.ts`: text/plain form-post refused with no cookie, foreign and `null` origins refused, same-site and absent origin accepted, cross-site password change refused
+
 ## Dependencies
 
 - Phase 1 → Phase 2 → stories.

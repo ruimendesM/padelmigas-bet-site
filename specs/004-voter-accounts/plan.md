@@ -160,6 +160,13 @@ the device voter's ballots with each group's tournament; read the account voter'
 `move`, `DELETE` for `discard` (entries cascade), nothing for `leave`. A concurrent unique violation
 aborts the whole sign-in (FR-312); the user retries.
 
+**Cross-site writes (FR-324, analysis finding S1)**: `account-routes.requireSameSiteJson` runs first on
+register, sign-in and password change. It requires `Content-Type: application/json` (a cross-site
+page cannot send it without a CORS preflight, which is never answered) and, when an `Origin` header
+is present, that it names this host (nginx forwards `Host`). No `Origin` means a non-browser client,
+which carries no ambient cookie. Failures answer `MALFORMED_PAYLOAD` / `UNAUTHORISED` and set no
+cookie.
+
 **Rate limiting**: `rate-limit.ts` gains a bucket name. `'auth'`: 10 attempts / 10 min per hashed
 IP, shared by register and sign-in; same in-memory, salted, never-logged rules (FR-317).
 

@@ -325,7 +325,7 @@ export function createClient(config: ClientConfig) {
    *
    * `POST /api/v1/account` — FR-303, FR-304, FR-305, FR-307, FR-309, FR-317.
    * Voter-dependent: the server sends `no-store` and this call is never cached.
-   * Documented failures: MALFORMED_PAYLOAD, USERNAME_TAKEN, RATE_LIMITED.
+   * Documented failures: MALFORMED_PAYLOAD, USERNAME_TAKEN, RATE_LIMITED, UNAUTHORISED.
    */
   async register(params: { body: C.RegisterBody }): Promise<C.RegisterResponse> {
     const path = `/account`;
@@ -358,7 +358,7 @@ export function createClient(config: ClientConfig) {
    *
    * `POST /api/v1/account/session` — FR-310, FR-311, FR-312, FR-313, FR-314, FR-317, FR-321.
    * Voter-dependent: the server sends `no-store` and this call is never cached.
-   * Documented failures: MALFORMED_PAYLOAD, INVALID_CREDENTIALS, PASSWORD_CHANGE_REQUIRED, RATE_LIMITED.
+   * Documented failures: MALFORMED_PAYLOAD, INVALID_CREDENTIALS, PASSWORD_CHANGE_REQUIRED, RATE_LIMITED, UNAUTHORISED.
    */
   async signIn(params: { body: C.SignInBody }): Promise<C.SignInResponse> {
     const path = `/account/session`;

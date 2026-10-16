@@ -427,3 +427,97 @@ describe('PUT /api/v1/account/password', () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe('cross-site writes are refused (FR-324)', () => {
+  beforeEach(() => {
+    install({ now: NOW });
+  });
+
+  function rawPost(path: string, payload: string, headers: Record<string, string>): Request {
+    return new Request(`${BASE}${path}`, { method: 'POST', headers, body: payload });
+  }
+
+  it('refuses a text/plain sign-in shaped like JSON, the form-post attack, without setting cookies', async () => {
+    await registerOn(new Device(), 'rui.m');
+    const response = await signIn(
+      rawPost('/account/session', JSON.stringify({ username: 'rui.m', password: PASSWORD }), {
+        'content-type': 'text/plain',
+        origin: 'https://evil.example',
+        host: 'localhost',
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it('refuses a JSON sign-in or registration from another origin', async () => {
+    await registerOn(new Device(), 'rui.m');
+    const headers = {
+      'content-type': 'application/json',
+      origin: 'https://evil.example',
+      host: 'localhost',
+    };
+    const signedIn = await signIn(
+      rawPost(
+        '/account/session',
+        JSON.stringify({ username: 'rui.m', password: PASSWORD }),
+        headers,
+      ),
+    );
+    const registered = await register(
+      rawPost('/account', JSON.stringify({ username: 'outra', password: PASSWORD }), headers),
+    );
+    for (const response of [signedIn, registered]) {
+      expect(response.status).toBe(401);
+      expect((await body<ApiErrorWithIssues>(response)).code).toBe('UNAUTHORISED');
+      expect(response.headers.getSetCookie()).toEqual([]);
+    }
+  });
+
+  it('refuses the literal null origin of sandboxed pages', async () => {
+    const response = await register(
+      rawPost('/account', JSON.stringify({ username: 'rui.m', password: PASSWORD }), {
+        'content-type': 'application/json',
+        origin: 'null',
+        host: 'localhost',
+      }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('accepts a same-site origin, and a client that sends no origin at all', async () => {
+    const sameSite = await register(
+      rawPost('/account', JSON.stringify({ username: 'rui.m', password: PASSWORD }), {
+        'content-type': 'application/json; charset=utf-8',
+        origin: 'http://localhost',
+        host: 'localhost',
+      }),
+    );
+    expect(sameSite.status).toBe(201);
+    const noOrigin = await signIn(
+      rawPost('/account/session', JSON.stringify({ username: 'rui.m', password: PASSWORD }), {
+        'content-type': 'application/json',
+      }),
+    );
+    expect(noOrigin.status).toBe(200);
+  });
+
+  it('refuses a cross-site password change', async () => {
+    const device = new Device();
+    await registerOn(device, 'rui.m');
+    const response = await changePassword(
+      new Request(`${BASE}/account/password`, {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://evil.example',
+          host: 'localhost',
+          cookie: device.cookie ?? '',
+        },
+        body: JSON.stringify({ currentPassword: PASSWORD, newPassword: 'nova-palavra-2' }),
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect((await signInOn(new Device(), 'rui.m')).status).toBe(200);
+  });
+});

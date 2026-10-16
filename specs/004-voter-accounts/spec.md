@@ -183,6 +183,10 @@ can then vote.
 - **Repeated failed sign-ins** from one network are slowed down so passwords cannot be guessed at
   speed.
 - **Username typed with different capitals** at sign-in matches the account.
+- **Another website submits a sign-in form** on the visitor's behalf: refused, and the visitor's
+  device stays as it was (FR-324).
+- **Registering or signing in while already signed in**: the new session replaces the old one; the
+  device presents no logged-out identity at that point, so no ballots move.
 
 ## Requirements *(mandatory)*
 
@@ -253,6 +257,12 @@ can then vote.
 - **FR-322**: Every page MUST show whether the visitor is signed in (with their username) or offer
   sign-in and registration. Signed-in visitors MUST be able to reach sign-out and password change.
 - **FR-323**: All new copy MUST be in pt-PT.
+
+**Cross-site protection**
+
+- **FR-324**: Registration, sign-in and password change MUST refuse requests made from another site,
+  so no other website can sign a visitor's device in to an account they did not choose, or change
+  their password. Refused requests MUST set no session.
 
 ### Key Entities
 

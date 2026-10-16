@@ -21,6 +21,10 @@ All changes are additive under `/api/v1` (Principle III). Schemas live in
 
 `RATE_LIMITED` (429) applies to register and sign-in through the `auth` bucket.
 
+Register, sign-in and password change require `Content-Type: application/json` (otherwise
+`MALFORMED_PAYLOAD`) and, when the request carries an `Origin`, one naming this host (otherwise
+`UNAUTHORISED`). Refused requests set no cookie (FR-324).
+
 ## `POST /account` — `register`
 
 - Auth: none. Body: `{ username, password }`.

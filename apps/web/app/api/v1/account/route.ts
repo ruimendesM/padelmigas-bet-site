@@ -4,6 +4,7 @@ import { jsonBody, respond } from '../../../../src/server/adapter.js';
 import {
   currentCaller,
   enforceAuthRateLimit,
+  requireSameSiteJson,
   presentSession,
 } from '../../../../src/server/account-routes.js';
 import { getDeps } from '../../../../src/server/deps.js';
@@ -19,6 +20,7 @@ export async function POST(request: Request): Promise<Response> {
   return respond({
     parse: async () => {
       // Before the body is read: a flood costs one hash, not one argon2 run.
+      requireSameSiteJson(request);
       enforceAuthRateLimit(request);
       return {
         request: await jsonBody(request, registerRequest),
